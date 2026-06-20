@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>佑發空調 - 專案結案與淨利追蹤儀表板</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;
+  --surface:#ffffff;
+  --surface-2:#f1efe8;
+  --text:#2c2c2a;
+  --text-2:#5f5e5a;
+  --text-3:#888780;
+  --border:rgba(0,0,0,0.1);
+  --border-2:rgba(0,0,0,0.18);
+  --info-bg:#E6F1FB;
+  --info-text:#0C447C;
+  --info-border:#85B7EB;
+  --success-bg:#EAF3DE;
+  --success-text:#3B6D11;
+  --warn-bg:#FAEEDA;
+  --warn-text:#854F0B;
+  --danger-bg:#FCEBEB;
+  --danger-text:#A32D2D;
+  --green:#3B6D11;
+  --red:#A32D2D;
+  --blue:#185FA5;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--text);padding:20px;max-width:1200px;margin:0 auto;line-height:1.5}
+
+.app-header{padding:1.25rem 0 .75rem;border-bottom:1px solid var(--border);margin-bottom:1rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.app-title-group{flex:1;min-width:280px}
+.app-title{font-size:20px;font-weight:500}
+.app-sub{font-size:13px;color:var(--text-2);margin-top:3px}
+.app-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.btn{font-size:13px;padding:6px 13px;border:1px solid var(--border-2);border-radius:8px;background:transparent;color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:inherit}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--info-bg);color:var(--info-text);border-color:var(--info-border)}
+.btn.primary:hover{opacity:.85}
+.btn.success{background:var(--success-bg);color:var(--success-text);border-color:var(--success-text)}
+.btn.active{background:var(--info-bg);color:var(--info-text);border-color:var(--info-border)}
+
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:1.25rem}
+.mc{background:var(--surface-2);border-radius:8px;padding:.875rem 1rem}
+.mc-l{font-size:12px;color:var(--text-2);margin-bottom:4px}
+.mc-v{font-size:20px;font-weight:500}
+.mc-v.info{color:var(--info-text)}
+.mc-v.success{color:var(--success-text)}
+.mc-v.warn{color:var(--warn-text)}
+.mc-v.danger{color:var(--danger-text)}
+
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1rem;flex-wrap:wrap}
+.tab{padding:8px 14px;font-size:13px;cursor:pointer;color:var(--text-2);border:0;border-bottom:2px solid transparent;background:none;font-family:inherit}
+.tab.active{color:var(--info-text);border-bottom-color:var(--info-border)}
+.tab-panel{display:none;margin-bottom:1.25rem}
+.tab-panel.active{display:block}
+
+.sec{font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:8px}
+.tip{font-size:11px;color:var(--text-3);margin-bottom:8px}
+
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+.bar-ml{width:28px;color:var(--text-2);text-align:right;flex-shrink:0}
+.bar-bg{flex:1;height:22px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.bar-f{height:100%;border-radius:4px;background:var(--blue);display:flex;align-items:center;padding-left:7px;color:#fff;font-size:11px;font-weight:500;transition:width .4s}
+.bar-f.profit{background:var(--green)}
+.bar-f.loss{background:var(--red)}
+
+.profit-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+.profit-label{width:110px;text-align:right;font-size:11px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+.profit-bar-area{flex:1;position:relative;height:22px;background:var(--surface-2);border-radius:4px}
+.profit-bar{position:absolute;top:0;height:100%;border-radius:4px;display:flex;align-items:center;padding:0 6px;color:#fff;font-size:11px;font-weight:500}
+.profit-bar.pos{background:var(--green);left:50%}
+.profit-bar.neg{background:var(--red);right:50%}
+.profit-zero{position:absolute;top:-2px;bottom:-2px;left:50%;width:1px;background:var(--border-2)}
+.profit-pct{width:48px;text-align:right;font-size:11px;flex-shrink:0}
+
+.act-row{display:flex;gap:8px;align-items:center;margin-bottom:.875rem;flex-wrap:wrap}
+
+.tw{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1.25rem;background:var(--surface)}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:1000px}
+thead{background:var(--surface-2)}
+th{padding:9px 8px;text-align:left;font-weight:500;color:var(--text-2);font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 8px;color:var(--text);border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-2)}
+
+.badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:100px;font-weight:500;white-space:nowrap}
+.b-new{background:var(--success-bg);color:var(--success-text)}
+.b-oor{background:var(--surface-2);color:var(--text-3)}
+
+.cost-input,.amt-input{width:84px;font-size:12px;padding:4px 6px;border:1px solid var(--border-2);border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit}
+.nego-tag{font-size:10px;color:var(--warn-text);background:var(--warn-bg);padding:1px 5px;border-radius:100px;white-space:nowrap}
+.profit-cell{font-size:12px;font-weight:500}
+.profit-cell.pos{color:var(--green)}
+.profit-cell.neg{color:var(--red)}
+.profit-cell.zero{color:var(--text-3)}
+.profit-pct-tiny{font-size:10px;color:var(--text-3);font-weight:400}
+
+.pdf-cell{display:flex;align-items:center;gap:3px}
+.dl-btn,.up-label{display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:4px 7px;border:1px solid var(--border-2);border-radius:6px;background:transparent;cursor:pointer;white-space:nowrap;font-family:inherit;color:var(--text-2)}
+.dl-btn{color:var(--info-text);border-color:var(--info-border)}
+.dl-btn:hover{background:var(--info-bg)}
+.up-label:hover{background:var(--surface-2);color:var(--text)}
+.up-label input{display:none}
+
+.two-date{font-size:11px;line-height:1.4}
+.two-date .d2{color:var(--success-text);font-size:10px}
+
+.row-actions{display:flex;gap:3px}
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--text-3);padding:3px 5px;border-radius:4px;font-size:13px}
+.icon-btn:hover{background:var(--surface-2);color:var(--text)}
+.icon-btn.danger:hover{color:var(--red);background:var(--danger-bg)}
+
+/* modal */
+.mb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:1rem}
+.mb.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:540px;max-width:100%;max-height:90vh;overflow-y:auto}
+.mt{font-size:16px;font-weight:500;margin-bottom:1rem}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fr{margin-bottom:10px}
+.fl{font-size:12px;color:var(--text-2);margin-bottom:3px;display:block}
+.fr input,.fr select,.fr textarea{width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--border-2);border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit}
+.grp{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)}
+.grp-title{font-size:12px;font-weight:500;color:var(--text-2);margin-bottom:8px}
+.hint{font-size:11px;color:var(--text-3);margin-top:3px}
+.preview-box{font-size:12px;color:var(--text-2);padding:8px 10px;background:var(--surface);border-radius:4px;margin-top:6px;line-height:1.7}
+.preview-box b{color:var(--text);font-weight:500}
+.preview-box .pos{color:var(--green);font-weight:500}
+.preview-box .neg{color:var(--red);font-weight:500}
+.pdf-box{border:1px dashed var(--border-2);border-radius:8px;padding:14px;text-align:center;cursor:pointer;margin-bottom:10px}
+.pdf-box:hover{background:var(--surface-2)}
+.pdf-box input{display:none}
+.pdf-box .pi{font-size:24px;color:var(--text-3);margin-bottom:4px}
+.pdf-box .pl{font-size:13px;color:var(--text-2)}
+.pdf-box .pn{font-size:12px;color:var(--info-text);margin-top:4px;font-weight:500}
+.mf{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem}
+.empty{text-align:center;padding:2rem;color:var(--text-3);font-size:13px}
+
+.help-box{background:var(--info-bg);border-radius:8px;padding:12px 14px;margin-bottom:1rem;font-size:13px;color:var(--info-text);line-height:1.7}
+.help-box b{font-weight:500}
+.help-box ol{margin-left:1.2rem;margin-top:6px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:.95}
+
+.status-select{font-size:11px;padding:3px 5px;border:1px solid var(--border-2);border-radius:6px;background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit}
+
+details.help-details{margin-bottom:1rem}
+details.help-details summary{cursor:pointer;font-size:13px;color:var(--info-text);padding:6px 0}
+details.help-details summary:hover{text-decoration:underline}
+.help-content{background:var(--surface-2);border-radius:8px;padding:14px 18px;margin-top:8px;font-size:13px;line-height:1.7;color:var(--text-2)}
+.help-content b{color:var(--text);font-weight:500}
+.help-content code{background:var(--surface);padding:2px 6px;border-radius:4px;font-family:'Menlo','Consolas',monospace;font-size:12px;color:var(--info-text)}
+
+/* ── 搜尋欄 ── */
+.search-wrap{position:relative;display:flex;align-items:center}
+.search-input{padding:6px 26px 6px 10px;font-size:13px;border:1px solid var(--border-2);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;width:200px;outline:none}
+.search-input:focus{border-color:var(--info-border)}
+.search-clear{position:absolute;right:7px;cursor:pointer;color:var(--text-3);background:none;border:none;font-size:16px;line-height:1;padding:0}
+.search-clear:hover{color:var(--text)}
+.search-count{font-size:12px;color:var(--text-3);white-space:nowrap}
+
+/* ── 結案清單標籤 ── */
+.cl-tag{font-size:10px;padding:1px 5px;border-radius:100px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-3);white-space:nowrap}
+.cl-tag.partial{background:var(--warn-bg);color:var(--warn-text);border-color:var(--warn-text)}
+.cl-tag.done{background:var(--success-bg);color:var(--success-text);border-color:var(--success-text)}
+
+/* ── 結案清單 Modal ── */
+.cl-item{display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.cl-item:last-child{border-bottom:none}
+.cl-item:hover{background:var(--surface-2);margin:0 -4px;padding:8px 8px;border-radius:4px}
+.cl-item input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--green);flex-shrink:0}
+.cl-item .cl-label{font-size:13px;color:var(--text);flex:1}
+.cl-item.checked .cl-label{color:var(--text-3);text-decoration:line-through}
+.cl-progress-wrap{margin-bottom:12px}
+.cl-progress-text{font-size:12px;color:var(--text-2);margin-bottom:5px}
+.cl-progress-bar{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.cl-progress-fill{height:100%;background:var(--green);border-radius:3px;transition:width .3s}
+
+@media (max-width:700px){
+  body{padding:10px}
+  .app-title{font-size:17px}
+  .mc-v{font-size:17px}
+  .search-input{width:140px}
+}
+
+/* ── 暗黑模式 ── */
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#1a1a1a;
+    --surface:#2d2d2d;
+    --surface-2:#383836;
+    --text:#e8e6e1;
+    --text-2:#a8a6a0;
+    --text-3:#6b6966;
+    --border:rgba(255,255,255,0.1);
+    --border-2:rgba(255,255,255,0.18);
+    --info-bg:#0d2a44;
+    --info-text:#7ab8f5;
+    --info-border:#1e5a96;
+    --success-bg:#1a2e0d;
+    --success-text:#7ab84a;
+    --warn-bg:#2e1e05;
+    --warn-text:#d4883d;
+    --danger-bg:#2e0d0d;
+    --danger-text:#e06060;
+    --green:#7ab84a;
+    --red:#e06060;
+    --blue:#7ab8f5;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-title-group">
+    <div class="app-title">專案結案與淨利追蹤儀表板</div>
+    <div class="app-sub">佑發空調工程服務有限公司 · 自動扣除營業稅5% · 資料自動儲存</div>
+  </div>
+  <div class="app-actions">
+    <button class="btn" id="syncBtn" onclick="handleSyncBtn()">🔗 連接雲端同步</button>
+    <button class="btn" onclick="exportData()">💾 匯出JSON</button>
+    <button class="btn" onclick="exportCSV()">📊 匯出CSV</button>
+    <label class="btn">📂 匯入資料<input type="file" accept=".json" style="display:none" onchange="importData(this)"></label>
+    <button class="btn primary" onclick="openAdd()">＋ 新增案件</button>
+  </div>
+</div>
+
+<details class="help-details">
+  <summary>🛈 第一次使用？點此看 Google Drive 設定教學</summary>
+  <div class="help-content">
+    <p><b>讓家裡和公司電腦資料自動同步：</b></p>
+    <ol>
+      <li>兩台電腦都到 <code>google.com/drive/download</code> 下載 Google Drive 桌面版</li>
+      <li>登入同一個 Google 帳號</li>
+      <li>在 Drive 中建立資料夾，例如 <code>佑發空調系統</code></li>
+      <li>把這個 HTML 檔放進該資料夾</li>
+      <li>雙擊 HTML 即可使用，操作完按「💾 匯出JSON」儲存到同一個資料夾</li>
+      <li>到另一台電腦打開同一個 HTML 後，按「📂 匯入資料」載入即可</li>
+    </ol>
+    <p style="margin-top:8px"><b>備註：</b>本程式會把資料自動暫存在本機瀏覽器內，但建議定期匯出 JSON 到 Drive 做為跨電腦備份。</p>
+  </div>
+</details>
+
+<div class="metrics" id="metrics"></div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('case',this)">每月案件</button>
+  <button class="tab" onclick="switchTab('revenue',this)">每月營收</button>
+  <button class="tab" onclick="switchTab('profit',this)">每月淨利</button>
+  <button class="tab" onclick="switchTab('ranking',this)">獲利排名</button>
+</div>
+
+<div id="tab-case" class="tab-panel active"><div id="chartCase"></div></div>
+<div id="tab-revenue" class="tab-panel"><div id="chartRevenue"></div></div>
+<div id="tab-profit" class="tab-panel"><div id="chartProfit"></div></div>
+<div id="tab-ranking" class="tab-panel">
+  <div class="tip">以淨利金額排序，中央為零；右側綠色為獲利、左側紅色為虧損</div>
+  <div id="chartRanking"></div>
+</div>
+
+<div class="act-row">
+  <button class="btn active" onclick="setFilter('all',this)">全部</button>
+  <button class="btn" onclick="setFilter('range',this)">本期（3-6月）</button>
+  <button class="btn" onclick="setFilter('進行中',this)">進行中</button>
+  <button class="btn" onclick="setFilter('結案完成',this)">結案完成</button>
+  <div style="flex:1"></div>
+  <div class="search-wrap">
+    <input class="search-input" id="searchInput" type="text" placeholder="搜尋案號、客戶、工程名稱…" oninput="onSearch(this.value)">
+    <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none" title="清除">×</button>
+  </div>
+  <span class="search-count" id="searchCount"></span>
+</div>
+
+<div class="sec">案件列表（成本欄位可直接編輯）</div>
+<div class="tw">
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:104px">案號</th>
+          <th style="width:64px">日期</th>
+          <th style="width:130px">客戶</th>
+          <th>工程名稱</th>
+          <th style="width:104px">收入(未稅)</th>
+          <th style="width:90px">成本</th>
+          <th style="width:110px">淨利</th>
+          <th style="width:108px">狀態</th>
+          <th style="width:88px">報價單</th>
+          <th style="width:88px">操作</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 新增／編輯案件 Modal -->
+<div class="mb" id="mb" onclick="closeMbBg(event)">
+  <div class="modal">
+    <div class="mt" id="modal-title">新增案件</div>
+    <div class="fg">
+      <div class="fr"><label class="fl">案號</label><input id="fId" placeholder="1150304PSKS5"></div>
+      <div class="fr"><label class="fl">報價日期</label><input id="fDate" type="date"></div>
+    </div>
+    <div class="fr">
+      <label class="fl">施工開始日（選填）</label>
+      <input id="fStart" type="date">
+      <div class="hint">投標案填得標後實際施工日</div>
+    </div>
+    <div class="fr"><label class="fl">客戶名稱</label><input id="fClient" placeholder="客戶公司名稱"></div>
+    <div class="fr"><label class="fl">工程名稱</label><input id="fName" placeholder="工程描述"></div>
+
+    <div class="grp">
+      <div class="grp-title">收入設定</div>
+      <div class="fg">
+        <div class="fr">
+          <label class="fl">報價金額（元）</label>
+          <input id="fAmt" type="number" placeholder="149121" oninput="updatePreview()">
+        </div>
+        <div class="fr">
+          <label class="fl">議價金額（元）</label>
+          <input id="fNego" type="number" placeholder="選填" oninput="updatePreview()">
+        </div>
+      </div>
+      <div class="fr" style="margin-bottom:0">
+        <label class="fl">含稅 / 未稅</label>
+        <select id="fTax" onchange="updatePreview()"><option value="inc">含稅</option><option value="exc">未稅</option></select>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="grp-title">成本與淨利預估</div>
+      <div class="fr">
+        <label class="fl">總成本（元）</label>
+        <input id="fCost" type="number" placeholder="材料+人工+雜支總和" oninput="updatePreview()">
+        <div class="hint">不知道可先空白，之後在列表編輯</div>
+      </div>
+      <div class="preview-box" id="profitPreview">填入金額後，自動顯示淨利預估</div>
+    </div>
+
+    <label class="pdf-box">
+      <input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.jpg,.jpeg,.png" id="fPdf" onchange="previewPdf(this)">
+      <div class="pi" id="fPdfIcon">📄</div>
+      <div class="pl">點此上傳文件（PDF、Excel、Word、圖片）</div>
+      <div class="pn" id="fPdfName"></div>
+    </label>
+
+    <div class="fr">
+      <label class="fl">狀態</label>
+      <select id="fStatus"><option>進行中</option><option>待核准</option><option>結案完成</option></select>
+    </div>
+    <div class="fr"><label class="fl">備註</label><input id="fNote" placeholder="選填"></div>
+
+    <div class="mf">
+      <button class="btn" onclick="closeMb()">取消</button>
+      <button class="btn primary" id="modal-confirm" onclick="confirmModal()">確認新增</button>
+    </div>
+  </div>
+</div>
+
+<!-- 結案核對清單 Modal -->
+<div class="mb" id="cl-mb" onclick="closeClMbBg(event)">
+  <div class="modal" style="width:460px">
+    <div class="mt" id="cl-title">結案核對清單</div>
+    <div class="cl-progress-wrap">
+      <div class="cl-progress-text" id="cl-progress-text">0 / 8 項完成</div>
+      <div class="cl-progress-bar"><div class="cl-progress-fill" id="cl-progress-fill" style="width:0%"></div></div>
+    </div>
+    <div id="cl-items"></div>
+    <div class="mf">
+      <button class="btn primary" onclick="closeClMb()">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 雲端同步首次設定 Modal -->
+<div class="mb" id="setup-mb">
+  <div class="modal" style="width:420px;text-align:center">
+    <div style="font-size:36px;margin-bottom:.75rem">🔗</div>
+    <div class="mt" style="text-align:center">連接 Google Drive 資料夾</div>
+    <p style="font-size:13px;color:var(--text-2);line-height:1.7;margin-bottom:1.25rem">
+      這台電腦是第一次開啟，需要選一次 Google Drive 資料夾，<br>
+      之後資料就會自動同步到所有電腦。
+    </p>
+    <div style="background:var(--info-bg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--info-text);text-align:left;margin-bottom:1.25rem;line-height:1.8">
+      📁 請選擇：<b>我的雲端硬碟 → 佑發空調系統 → files</b>
+    </div>
+    <div class="mf" style="justify-content:center;gap:12px">
+      <button class="btn" onclick="closeSetupMb()">先不要</button>
+      <button class="btn primary" onclick="connectAndCloseSetup()">選擇 Google Drive 資料夾</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TAX_RATE=0.05;
+const STORAGE_KEY='yofa_dashboard_v1';
+const CHECKLIST=[
+  '審查專案計劃與預算',
+  '更新施工完工文件',
+  '取得客戶完工確認簽章',
+  '索取客戶核准／驗收單',
+  '確認款項已收訖',
+  '歸檔估價單與相關圖面',
+  '舉行專案後內部檢討',
+  '交接剩餘材料與庫存'
+];
+
+// 初始資料（首次開啟才使用，之後自動讀本機儲存）
+const INITIAL_DATA=[
+  {id:'1150309PSKS6',quoteDate:'2026-03-09',startDate:'2026-03-09',client:'麗綺室內裝修工程有限公司',name:'博愛路60號3樓空調設備增設改善',amt:417291,nego:360000,taxInc:true,cost:0,status:'進行中',note:'',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+  {id:'1150304PSKS5',quoteDate:'2026-03-04',startDate:'2026-03-04',client:'國立臺灣大學',name:'綜合體育館空調設備汰換工程',amt:149121,nego:null,taxInc:true,cost:0,status:'進行中',note:'512、513室',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+  {id:'1150326P001',quoteDate:'2026-03-26',startDate:'2026-03-26',client:'大員昌（旅樂序重慶店）',name:'熱泵緊急搶修工程',amt:30975,nego:null,taxInc:true,cost:0,status:'進行中',note:'需另檢查頂樓水泵及溫控',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+  {id:'1150405PS7',quoteDate:'2026-04-05',startDate:'2026-04-05',client:'大員昌（旅樂序重慶館）',name:'熱泵機房維護工程',amt:34755,nego:null,taxInc:true,cost:0,status:'進行中',note:'殼管式冷凝器藥劑清洗',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+  {id:'1150413PS7',quoteDate:'2026-04-13',startDate:'2026-04-13',client:'大員昌（旅樂序重慶館）',name:'熱泵更新工程',amt:30692,nego:null,taxInc:true,cost:0,status:'進行中',note:'特殊電壓訂製品，交期30天',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+  {id:'1150512PS7',quoteDate:'2026-05-12',startDate:'2026-05-12',client:'大員昌（旅樂序站前一館）',name:'恆壓泵浦變頻器更新工程',amt:50610,nego:null,taxInc:true,cost:0,status:'進行中',note:'僅保固#1號變頻器',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+  {id:'1150520PS2',quoteDate:'2026-05-20',startDate:'2026-05-20',client:'智電系統股份有限公司',name:'冰水管修繕工程',amt:172242,nego:150000,taxInc:false,cost:0,status:'進行中',note:'議價15萬未稅',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+  {id:'1141121KS7',quoteDate:'2025-11-21',startDate:'2026-06-16',client:'國家通訊傳播委員會',name:'濟南路辦公室空調通風改善工程',amt:219083,nego:null,taxInc:true,cost:0,status:'進行中',note:'投標案，115-06-16得標施作',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+  {id:'1150609PS1',quoteDate:'2026-06-09',startDate:'2026-06-09',client:'國立臺灣大學',name:'禮賢樓2F學生餐廳 HITACHI VRV設備保養工程（大保養37台）',amt:142223,nego:null,taxInc:true,cost:0,status:'進行中',note:'本報價單依實際現場施作數量作為最後請款依據',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+  {id:'1150615PS1',quoteDate:'2026-06-15',startDate:'2026-06-15',client:'國立臺灣科技大學',name:'EE大樓壁掛分離式保養工程',amt:10290,nego:null,taxInc:true,cost:0,status:'進行中',note:'蒸發器藥劑清洗、冷凝器高壓清洗等',pdfName:'',pdfData:null,checks:[false,false,false,false,false,false,false,false]},
+];
+
+let projects=[];
+let filter='all';
+let editIdx=null;
+let searchTerm='';
+let clEditIdx=null;
+
+// ===== Storage =====
+function saveLocal(){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(projects));}
+  catch(e){console.warn('localStorage 已滿，請匯出 JSON 到 Drive 備份',e);}
+  syncSave(); // 同步寫入雲端資料夾（背景執行）
+}
+
+// ===== 雲端資料夾同步 (File System Access API) =====
+const SYNC_FILE='yofa-sync.json';
+let syncDirHandle=null;
+
+function openSyncDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open('yofa_sync_db',1);
+    req.onupgradeneeded=e=>e.target.result.createObjectStore('handles');
+    req.onsuccess=e=>res(e.target.result);
+    req.onerror=rej;
+  });
+}
+async function getStoredHandle(){
+  try{
+    const db=await openSyncDB();
+    return await new Promise((res,rej)=>{
+      const tx=db.transaction('handles','readonly');
+      const req=tx.objectStore('handles').get('dir');
+      req.onsuccess=()=>res(req.result||null);
+      req.onerror=rej;
+    });
+  }catch(e){return null;}
+}
+async function storeHandle(handle){
+  try{
+    const db=await openSyncDB();
+    await new Promise((res,rej)=>{
+      const tx=db.transaction('handles','readwrite');
+      tx.objectStore('handles').put(handle,'dir');
+      tx.oncomplete=res;tx.onerror=rej;
+    });
+  }catch(e){}
+}
+
+function updateSyncBtn(state){
+  const btn=document.getElementById('syncBtn');
+  if(!btn)return;
+  if(state==='connected'){
+    const last=localStorage.getItem('yofa_last_sync');
+    const timeStr=last?` ${new Date(last).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}`:'';
+    btn.textContent=`✅ 已同步${timeStr}`;
+    btn.className='btn success';
+    btn.title='點擊可重新從雲端載入最新資料';
+  }else if(state==='reauth'){
+    btn.textContent='🔑 點此重新授權';btn.className='btn';btn.title='';
+  }else{
+    btn.textContent='🔗 連接雲端同步';btn.className='btn';btn.title='';
+  }
+}
+
+async function syncSave(){
+  if(!syncDirHandle)return;
+  try{
+    const perm=await syncDirHandle.queryPermission({mode:'readwrite'});
+    if(perm!=='granted')return;
+    const fh=await syncDirHandle.getFileHandle(SYNC_FILE,{create:true});
+    const w=await fh.createWritable();
+    await w.write(JSON.stringify(projects,null,2));
+    await w.close();
+    localStorage.setItem('yofa_last_sync',new Date().toISOString());
+    updateSyncBtn('connected');
+  }catch(e){console.warn('syncSave',e);}
+}
+
+async function syncLoad(){
+  if(!syncDirHandle)return false;
+  try{
+    const perm=await syncDirHandle.requestPermission({mode:'readwrite'});
+    if(perm!=='granted'){updateSyncBtn('reauth');return false;}
+    const fh=await syncDirHandle.getFileHandle(SYNC_FILE);
+    const text=await(await fh.getFile()).text();
+    const data=JSON.parse(text);
+    if(!Array.isArray(data))return false;
+    projects=data.map(p=>({...p,checks:p.checks||[false,false,false,false,false,false,false,false]}));
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(projects));
+    renderAll();
+    updateSyncBtn('connected');
+    showToast('✅ 已從雲端資料夾載入最新資料');
+    return true;
+  }catch(e){
+    if(e.name==='NotFoundError'){
+      // 檔案不存在就把目前資料寫進去
+      await syncSave();
+      updateSyncBtn('connected');
+      showToast('✅ 雲端同步已連接，資料已上傳');
+      return true;
+    }
+    console.warn('syncLoad',e);return false;
+  }
+}
+
+async function connectSyncFolder(){
+  try{
+    const handle=await window.showDirectoryPicker({mode:'readwrite',startIn:'desktop'});
+    syncDirHandle=handle;
+    await storeHandle(handle);
+    await syncLoad();
+  }catch(e){
+    if(e.name!=='AbortError')showToast('連接失敗：'+e.message);
+  }
+}
+
+async function handleSyncBtn(){
+  if(syncDirHandle){
+    // 重新授權或重新載入
+    const loaded=await syncLoad();
+    if(!loaded)await connectSyncFolder();
+  }else{
+    await connectSyncFolder();
+  }
+}
+
+async function initSync(){
+  if(!window.showDirectoryPicker){return;}
+  const stored=await getStoredHandle();
+  if(!stored){
+    // 這台電腦從未設定過，自動彈出提示
+    setTimeout(()=>document.getElementById('setup-mb').classList.add('open'),600);
+    return;
+  }
+  syncDirHandle=stored;
+  try{
+    const perm=await stored.queryPermission({mode:'readwrite'});
+    if(perm==='granted'){
+      updateSyncBtn('connected');
+      await syncLoad();
+    }else{
+      updateSyncBtn('reauth');
+    }
+  }catch(e){updateSyncBtn('reauth');}
+}
+
+function closeSetupMb(){document.getElementById('setup-mb').classList.remove('open');}
+
+async function connectAndCloseSetup(){
+  closeSetupMb();
+  await connectSyncFolder();
+}
+function loadLocal(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const data=JSON.parse(raw);
+      // 相容舊資料：自動補入 checks 欄位
+      projects=data.map(p=>({...p,checks:p.checks||[false,false,false,false,false,false,false,false]}));
+      return true;
+    }
+  }catch(e){console.warn(e);}
+  return false;
+}
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ===== 匯出 JSON =====
+function exportData(){
+  const data=JSON.stringify(projects,null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const d=new Date();
+  const ts=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  a.download=`yofa-data-${ts}.json`;
+  a.click();
+  showToast('已匯出 JSON 資料');
+}
+
+// ===== 匯出 CSV（UTF-8 BOM，Excel 可直接開啟）=====
+function exportCSV(){
+  const BOM='﻿';
+  const headers=['案號','報價日期','施工日期','客戶','工程名稱','收入(未稅)','成本','淨利','毛利率%','狀態'];
+  const esc=v=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+  const csvRows=projects.map(p=>[
+    p.id,p.quoteDate||'',p.startDate||'',p.client,p.name,
+    Math.round(revenue(p)),p.cost||0,Math.round(profit(p)),Math.round(profitPct(p)),p.status
+  ].map(esc).join(','));
+  const csv=BOM+[headers.join(','),...csvRows].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const d=new Date();
+  const ts=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  a.download=`yofa-report-${ts}.csv`;
+  a.click();
+  showToast('已匯出 CSV 報表');
+}
+
+function importData(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!Array.isArray(data))throw new Error('格式錯誤');
+      if(!confirm(`即將載入 ${data.length} 筆案件，會覆蓋目前資料，確定嗎？`))return;
+      projects=data.map(p=>({...p,checks:p.checks||[false,false,false,false,false,false,false,false]}));
+      saveLocal();renderAll();
+      showToast('資料已匯入');
+    }catch(err){alert('匯入失敗：'+err.message);}
+  };
+  r.readAsText(f);
+  input.value='';
+}
+
+// ===== Calculations =====
+function getStartMonth(p){return new Date(p.startDate).getMonth()+1;}
+function getStartYear(p){return new Date(p.startDate).getFullYear();}
+function inRange(p){const m=getStartMonth(p);return getStartYear(p)===2026&&m>=3&&m<=6;}
+function revenue(p){
+  const gross=p.nego!=null?p.nego:p.amt;
+  return p.taxInc?gross/(1+TAX_RATE):gross;
+}
+function profit(p){return revenue(p)-(p.cost||0);}
+function profitPct(p){const r=revenue(p);return r>0?(profit(p)/r*100):0;}
+function fmt(n){if(n===0)return '$0';if(n==null||isNaN(n))return '-';return (n<0?'-$':'$')+Math.abs(Math.round(n)).toLocaleString();}
+function fmtK(n){if(n==null||isNaN(n))return '';return (n<0?'-':'')+'$'+Math.abs(Math.round(n)).toLocaleString();}
+function fmtDate(d){return d?d.slice(5,10).replace('-','/'):'—';}
+
+// ===== File handling =====
+function readFileAsDataUrl(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(f);});}
+function downloadPdf(idx){const p=projects[idx];if(!p.pdfData)return;const a=document.createElement('a');a.href=p.pdfData;a.download=p.pdfName||p.id+'.pdf';a.click();}
+
+// ===== 搜尋 =====
+function onSearch(val){
+  searchTerm=val.trim();
+  document.getElementById('searchClear').style.display=searchTerm?'':'none';
+  renderTable();
+}
+function clearSearch(){
+  document.getElementById('searchInput').value='';
+  onSearch('');
+}
+
+// ===== 結案核對清單 =====
+function openChecklist(idx){
+  clEditIdx=idx;
+  renderChecklistModal();
+  document.getElementById('cl-mb').classList.add('open');
+}
+function closeClMb(){document.getElementById('cl-mb').classList.remove('open');}
+function closeClMbBg(e){if(e.target===document.getElementById('cl-mb'))closeClMb();}
+
+function renderChecklistModal(){
+  const p=projects[clEditIdx];
+  const checks=p.checks||[false,false,false,false,false,false,false,false];
+  const done=checks.filter(Boolean).length;
+  const shortName=p.client.replace(/（.*?）/g,'').slice(0,12);
+  document.getElementById('cl-title').textContent=`結案核對 — ${shortName}`;
+  document.getElementById('cl-progress-text').textContent=`${done} / 8 項完成`;
+  document.getElementById('cl-progress-fill').style.width=`${done/8*100}%`;
+  document.getElementById('cl-items').innerHTML=CHECKLIST.map((item,i)=>`
+    <div class="cl-item${checks[i]?' checked':''}" onclick="toggleCheck(${clEditIdx},${i})">
+      <input type="checkbox"${checks[i]?' checked':''} onclick="event.stopPropagation();toggleCheck(${clEditIdx},${i})">
+      <span class="cl-label">${item}</span>
+    </div>`).join('');
+}
+
+function toggleCheck(idx,i){
+  if(!projects[idx].checks)projects[idx].checks=[false,false,false,false,false,false,false,false];
+  projects[idx].checks[i]=!projects[idx].checks[i];
+  const done=projects[idx].checks.filter(Boolean).length;
+  if(done===8&&projects[idx].status==='進行中'){
+    projects[idx].status='待核准';
+    showToast('核對清單全部完成！狀態已升級為「待核准」');
+  }
+  saveLocal();
+  if(document.getElementById('cl-mb').classList.contains('open'))renderChecklistModal();
+  renderTable();
+  renderMetrics();
+}
+
+// ===== Render =====
+function renderMetrics(){
+  const rp=projects.filter(inRange);
+  const totalRev=rp.reduce((s,p)=>s+revenue(p),0);
+  const totalCost=rp.reduce((s,p)=>s+(p.cost||0),0);
+  const totalProfit=totalRev-totalCost;
+  const overallPct=totalRev>0?(totalProfit/totalRev*100):0;
+  document.getElementById('metrics').innerHTML=`
+    <div class="mc"><div class="mc-l">本期案件數</div><div class="mc-v">${rp.length}</div></div>
+    <div class="mc"><div class="mc-l">總收入（未稅）</div><div class="mc-v info">${fmt(totalRev)}</div></div>
+    <div class="mc"><div class="mc-l">總成本</div><div class="mc-v warn">${fmt(totalCost)}</div></div>
+    <div class="mc"><div class="mc-l">淨利（毛利率）</div><div class="mc-v ${totalProfit>=0?'success':'danger'}">${fmt(totalProfit)} <span style="font-size:11px">(${Math.round(overallPct)}%)</span></div></div>`;
+}
+
+function renderChartCase(){
+  const months=[3,4,5,6],mL=['3月','4月','5月','6月'];
+  const max=Math.max(1,...months.map(m=>projects.filter(p=>inRange(p)&&getStartMonth(p)===m).length));
+  document.getElementById('chartCase').innerHTML=months.map((m,i)=>{
+    const cnt=projects.filter(p=>inRange(p)&&getStartMonth(p)===m).length;
+    const pct=max>0?Math.round(cnt/max*100):0;
+    return `<div class="bar-row"><div class="bar-ml">${mL[i]}</div><div class="bar-bg"><div class="bar-f" style="width:${cnt>0?Math.max(pct,5):0}%">${cnt>0?cnt+'件':''}</div></div></div>`;
+  }).join('');
+}
+function renderChartRevenue(){
+  const months=[3,4,5,6],mL=['3月','4月','5月','6月'];
+  const monthRevs=months.map(m=>projects.filter(p=>inRange(p)&&getStartMonth(p)===m).reduce((s,p)=>s+revenue(p),0));
+  const max=Math.max(1,...monthRevs);
+  document.getElementById('chartRevenue').innerHTML=months.map((m,i)=>{
+    const rev=monthRevs[i];
+    const pct=max>0?Math.round(rev/max*100):0;
+    return `<div class="bar-row"><div class="bar-ml">${mL[i]}</div><div class="bar-bg"><div class="bar-f" style="width:${rev>0?Math.max(pct,5):0}%">${rev>0?fmtK(rev):''}</div></div></div>`;
+  }).join('');
+}
+function renderChartProfit(){
+  const months=[3,4,5,6],mL=['3月','4月','5月','6月'];
+  const monthProfits=months.map(m=>projects.filter(p=>inRange(p)&&getStartMonth(p)===m).reduce((s,p)=>s+profit(p),0));
+  const max=Math.max(1,...monthProfits.map(Math.abs));
+  document.getElementById('chartProfit').innerHTML=months.map((m,i)=>{
+    const pr=monthProfits[i];
+    const pct=max>0?Math.round(Math.abs(pr)/max*100):0;
+    const cls=pr>=0?'profit':'loss';
+    return `<div class="bar-row"><div class="bar-ml">${mL[i]}</div><div class="bar-bg"><div class="bar-f ${cls}" style="width:${pr!==0?Math.max(pct,5):0}%">${pr!==0?fmtK(pr):''}</div></div></div>`;
+  }).join('');
+}
+function renderChartRanking(){
+  const rp=projects.filter(inRange).slice().sort((a,b)=>profit(b)-profit(a));
+  if(!rp.length){document.getElementById('chartRanking').innerHTML=`<div class="empty">無資料</div>`;return;}
+  const max=Math.max(1,...rp.map(p=>Math.abs(profit(p))));
+  document.getElementById('chartRanking').innerHTML=rp.map(p=>{
+    const pr=profit(p);
+    const pct=max>0?Math.round(Math.abs(pr)/max*50):0;
+    const isPos=pr>=0;
+    const shortName=p.client.replace(/（.*?）/g,'').slice(0,10);
+    return `<div class="profit-row">
+      <div class="profit-label" title="${p.client} - ${p.name}">${shortName}</div>
+      <div class="profit-bar-area">
+        <div class="profit-zero"></div>
+        ${pr!==0?`<div class="profit-bar ${isPos?'pos':'neg'}" style="width:${Math.max(pct,3)}%">${fmtK(pr)}</div>`:''}
+      </div>
+      <div class="profit-pct" style="color:${isPos?'var(--green)':'var(--red)'}">${Math.round(profitPct(p))}%</div>
+    </div>`;
+  }).join('');
+}
+function renderAllCharts(){renderChartCase();renderChartRevenue();renderChartProfit();renderChartRanking();}
+
+function switchTab(name,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(t=>t.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+function renderTable(){
+  let rows;
+  if(filter==='all') rows=projects;
+  else if(filter==='range') rows=projects.filter(inRange);
+  else rows=projects.filter(p=>p.status===filter);
+
+  // 搜尋篩選
+  if(searchTerm){
+    const q=searchTerm.toLowerCase();
+    rows=rows.filter(p=>
+      (p.id||'').toLowerCase().includes(q)||
+      (p.client||'').toLowerCase().includes(q)||
+      (p.name||'').toLowerCase().includes(q)
+    );
+  }
+  document.getElementById('searchCount').textContent=searchTerm?`找到 ${rows.length} 筆`:'';
+
+  const tb=document.getElementById('tbody');
+  if(!rows.length){
+    tb.innerHTML=`<tr><td colspan="10"><div class="empty">${searchTerm?'沒有符合的案件':'目前無案件'}</div></td></tr>`;
+    return;
+  }
+
+  tb.innerHTML=rows.map(p=>{
+    const idx=projects.indexOf(p);
+    const rev=revenue(p);
+    const pr=profit(p);
+    const ppct=profitPct(p);
+    const isTender=p.quoteDate!==p.startDate;
+    const datecell=isTender
+      ?`<div class="two-date"><div>${fmtDate(p.startDate)}</div><div class="d2">報${fmtDate(p.quoteDate)}</div></div>`
+      :`<span style="font-size:12px">${fmtDate(p.startDate)}</span>`;
+    const tenderBadge=isTender?`<span class="badge b-new">投標</span> `:'';
+    const negoTag=p.nego!=null?`<span class="nego-tag">${p.taxInc?'議含':'議未'}</span>`:'';
+    const prCls=pr>0?'pos':(pr<0?'neg':'zero');
+    const pdfCell=p.pdfData
+      ?`<div class="pdf-cell">
+          <button class="dl-btn" onclick="downloadPdf(${idx})" title="${p.pdfName}">${fileIcon(p.pdfName)} ⬇</button>
+          <label class="up-label" title="重新上傳">🔄<input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.jpg,.jpeg,.png" onchange="uploadInline(${idx},this)"></label>
+        </div>`
+      :`<label class="up-label">📎 上傳<input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.jpg,.jpeg,.png" onchange="uploadInline(${idx},this)"></label>`;
+    const checks=p.checks||[false,false,false,false,false,false,false,false];
+    const done=checks.filter(Boolean).length;
+    const clTagCls=done===8?'done':(done>0?'partial':'');
+    return `<tr>
+      <td style="color:var(--text-3);font-size:11px">${p.id}</td>
+      <td>${datecell}</td>
+      <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px" title="${p.client}">${p.client}</td>
+      <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px" title="${p.name}${p.note?' · '+p.note:''}">${tenderBadge}${p.name}</td>
+      <td><div style="display:flex;align-items:center;gap:3px"><span style="font-size:12px">${fmt(rev)}</span>${negoTag}</div></td>
+      <td><input class="cost-input" type="number" value="${p.cost||''}" placeholder="0" onchange="updateCost(${idx},this.value)"></td>
+      <td>
+        <div class="profit-cell ${prCls}">${fmt(pr)}</div>
+        <div class="profit-pct-tiny">${rev>0?Math.round(ppct)+'%':''}</div>
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">
+          <span class="cl-tag ${clTagCls}" title="結案清單進度">${done}/8</span>
+          <select class="status-select" onchange="updateStatus(${idx},this.value)">
+            ${['進行中','待核准','結案完成'].map(s=>`<option ${p.status===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </td>
+      <td>${pdfCell}</td>
+      <td><div class="row-actions">
+        <button class="icon-btn" onclick="openChecklist(${idx})" title="結案清單">📋</button>
+        <button class="icon-btn" onclick="openEdit(${idx})" title="編輯">✏️</button>
+        <button class="icon-btn danger" onclick="deleteProject(${idx})" title="刪除">🗑️</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ===== Actions =====
+async function uploadInline(idx,input){
+  const f=input.files[0];if(!f)return;
+  if(f.size>5*1024*1024){alert('檔案太大（超過5MB），可能會超過本機儲存上限。建議壓縮後再上傳。');}
+  projects[idx].pdfData=await readFileAsDataUrl(f);
+  projects[idx].pdfName=f.name;
+  saveLocal();renderTable();
+}
+function updateCost(idx,val){
+  const cost=parseFloat(val)||0;
+  if(cost<0){showToast('成本不能為負數');renderTable();return;}
+  projects[idx].cost=cost;
+  saveLocal();renderMetrics();renderAllCharts();renderTable();
+}
+function updateStatus(idx,val){projects[idx].status=val;saveLocal();renderMetrics();}
+function deleteProject(idx){
+  if(!confirm(`確定刪除案件「${projects[idx].id} - ${projects[idx].client}」？`))return;
+  projects.splice(idx,1);
+  saveLocal();renderAll();
+}
+function setFilter(f,btn){
+  filter=f;
+  document.querySelectorAll('.act-row .btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderTable();
+}
+
+function fileIcon(name){
+  if(!name)return '📄';
+  const ext=(name.split('.').pop()||'').toLowerCase();
+  if(ext==='pdf')return '📄';
+  if(ext==='xls'||ext==='xlsx')return '📊';
+  if(ext==='doc'||ext==='docx')return '📝';
+  if(ext==='jpg'||ext==='jpeg'||ext==='png')return '🖼️';
+  return '📎';
+}
+function previewPdf(input){
+  const f=input.files[0];
+  document.getElementById('fPdfName').textContent=f?f.name:'';
+  document.getElementById('fPdfIcon').textContent=f?fileIcon(f.name):'📄';
+}
+function updatePreview(){
+  const amt=parseFloat(document.getElementById('fAmt').value)||0;
+  const nego=document.getElementById('fNego').value;
+  const negoV=nego?parseFloat(nego):null;
+  const tax=document.getElementById('fTax').value==='inc';
+  const cost=parseFloat(document.getElementById('fCost').value)||0;
+  const gross=negoV!=null?negoV:amt;
+  const rev=tax?gross/1.05:gross;
+  const pr=rev-cost;
+  const pct=rev>0?(pr/rev*100):0;
+  const prCls=pr>0?'pos':(pr<0?'neg':'');
+  document.getElementById('profitPreview').innerHTML=`
+    收入（未稅）：<b>${fmt(rev)}</b>　成本：<b>${fmt(cost)}</b><br>
+    淨利：<span class="${prCls}">${fmt(pr)}</span> （毛利率 ${Math.round(pct)}%）`;
+}
+
+function openAdd(){
+  editIdx=null;
+  document.getElementById('modal-title').textContent='新增案件';
+  document.getElementById('modal-confirm').textContent='確認新增';
+  ['fId','fClient','fName','fNote'].forEach(k=>document.getElementById(k).value='');
+  ['fAmt','fNego','fCost'].forEach(k=>document.getElementById(k).value='');
+  document.getElementById('fDate').value='';
+  document.getElementById('fStart').value='';
+  document.getElementById('fStatus').value='進行中';
+  document.getElementById('fTax').value='inc';
+  document.getElementById('fPdfName').textContent='';
+  document.getElementById('fPdf').value='';
+  document.getElementById('profitPreview').innerHTML='填入金額後，自動顯示淨利預估';
+  document.getElementById('mb').classList.add('open');
+}
+
+function openEdit(idx){
+  editIdx=idx;
+  const p=projects[idx];
+  document.getElementById('modal-title').textContent='編輯案件';
+  document.getElementById('modal-confirm').textContent='儲存變更';
+  document.getElementById('fId').value=p.id||'';
+  document.getElementById('fDate').value=p.quoteDate||'';
+  document.getElementById('fStart').value=p.startDate===p.quoteDate?'':(p.startDate||'');
+  document.getElementById('fClient').value=p.client||'';
+  document.getElementById('fName').value=p.name||'';
+  document.getElementById('fAmt').value=p.amt||'';
+  document.getElementById('fNego').value=p.nego!=null?p.nego:'';
+  document.getElementById('fTax').value=p.taxInc?'inc':'exc';
+  document.getElementById('fCost').value=p.cost||'';
+  document.getElementById('fStatus').value=p.status||'進行中';
+  document.getElementById('fNote').value=p.note||'';
+  document.getElementById('fPdfName').textContent=p.pdfName||'';
+  document.getElementById('fPdf').value='';
+  updatePreview();
+  document.getElementById('mb').classList.add('open');
+}
+
+function closeMb(){document.getElementById('mb').classList.remove('open');}
+function closeMbBg(e){if(e.target===document.getElementById('mb'))closeMb();}
+
+async function confirmModal(){
+  const id=document.getElementById('fId').value.trim();
+  const client=document.getElementById('fClient').value.trim();
+  const name=document.getElementById('fName').value.trim();
+  const amt=parseFloat(document.getElementById('fAmt').value)||0;
+  const negoRaw=document.getElementById('fNego').value;
+  const nego=negoRaw?parseFloat(negoRaw):null;
+  const cost=parseFloat(document.getElementById('fCost').value)||0;
+
+  // ── 資料驗證 ──
+  if(!client||!name){showToast('請填寫客戶名稱與工程名稱');return;}
+  if(amt<=0){showToast('報價金額必須大於 0');return;}
+  if(cost<0){showToast('成本不能為負數');return;}
+  if(nego!=null&&nego>amt){showToast('議價金額不能超過報價金額');return;}
+  if(id&&id!=='—'){
+    const dup=projects.some((p,i)=>p.id===id&&(editIdx===null||i!==editIdx));
+    if(dup){showToast(`案號「${id}」已存在，請使用不同案號`);return;}
+  }
+
+  const fi=document.getElementById('fPdf').files[0];
+  let pdfData=editIdx!=null?projects[editIdx].pdfData:null;
+  let pdfName=editIdx!=null?projects[editIdx].pdfName:'';
+  if(fi){pdfData=await readFileAsDataUrl(fi);pdfName=fi.name;}
+  const qd=document.getElementById('fDate').value||new Date().toISOString().slice(0,10);
+  const sdRaw=document.getElementById('fStart').value;
+  const sd=sdRaw||qd;
+  const data={
+    id:id||'—',quoteDate:qd,startDate:sd,client,name,amt,nego,
+    taxInc:document.getElementById('fTax').value==='inc',
+    cost,
+    status:document.getElementById('fStatus').value,
+    note:document.getElementById('fNote').value.trim(),
+    pdfName,pdfData,
+    checks:editIdx!=null?(projects[editIdx].checks||[false,false,false,false,false,false,false,false]):[false,false,false,false,false,false,false,false]
+  };
+  if(editIdx!=null){projects[editIdx]=data;showToast('已更新');}
+  else{projects.push(data);showToast('已新增');}
+  closeMb();saveLocal();renderAll();
+}
+
+function renderAll(){renderMetrics();renderAllCharts();renderTable();}
+
+// ===== Init =====
+if(!loadLocal()){
+  projects=JSON.parse(JSON.stringify(INITIAL_DATA));
+  saveLocal();
+}
+renderAll();
+initSync(); // 嘗試自動重新連接上次的雲端資料夾
+</script>
+</body>
+</html>
