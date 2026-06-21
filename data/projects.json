@@ -263,30 +263,5 @@
       false,
       false
     ]
-  },
-  {
-    "id": "11150622PS1",
-    "quoteDate": "2026-05-20",
-    "startDate": "2026-05-24",
-    "client": "智電系統股份有限公司",
-    "name": "智電系統21F會議室冰水管路鏽蝕漏水修繕工程",
-    "amt": 15070,
-    "nego": null,
-    "taxInc": true,
-    "cost": 0,
-    "status": "結案完成",
-    "note": "",
-    "fileUrl": "https://raw.githubusercontent.com/Fakepan/yofa-dashboard/main/attachments/11150622PS1/1782060879787-1150524PS2-智電系統21F會議室冰水管路鏽蝕修繕工程 (1).pdf",
-    "fileName": "1150524PS2-智電系統21F會議室冰水管路鏽蝕修繕工程 (1).pdf",
-    "checks": [
-      false,
-      false,
-      false,
-      false,
-      false,
-      false,
-      false,
-      false
-    ]
   }
 ]
