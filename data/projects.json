@@ -248,5 +248,30 @@
       false,
       false
     ]
+  },
+  {
+    "id": "11150621PS1",
+    "quoteDate": "2026-03-26",
+    "startDate": "2026-03-27",
+    "client": "大員昌實業有限公司(旅樂序精品旅館重慶店熱泵機房改善工程)",
+    "name": "旅樂序精品旅館重慶店熱泵機房改善工程",
+    "amt": 18000,
+    "nego": null,
+    "taxInc": false,
+    "cost": 7000,
+    "status": "結案完成",
+    "note": "",
+    "pdfName": "",
+    "pdfData": null,
+    "checks": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
   }
 ]
