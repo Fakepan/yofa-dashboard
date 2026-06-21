@@ -247,7 +247,7 @@
     "name": "智電系統21F會議室冰水管路鏽蝕漏水修繕工程",
     "amt": 15070,
     "nego": null,
-    "taxInc": true,
+    "taxInc": false,
     "cost": 0,
     "status": "結案完成",
     "note": "",
