@@ -508,7 +508,9 @@ async function cloudSave(){
   setSyncBar('saving','<span class="spin">↻</span> 同步中…');
   try{
     const existing=await ghFetch('GET',GITHUB_DATA_PATH);
-    const content=toB64(JSON.stringify(projects,null,2));
+    // strip binary file data before upload to stay within GitHub API 1MB limit
+    const slim=projects.map(({pdfData,...rest})=>rest);
+    const content=toB64(JSON.stringify(slim,null,2));
     const now=new Date();
     await ghFetch('PUT',GITHUB_DATA_PATH,{
       message:`sync: 更新資料 ${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}`,
@@ -538,7 +540,9 @@ async function cloudLoad(){
     if(!file)return false;
     const data=JSON.parse(fromB64(file.content));
     if(!Array.isArray(data))return false;
-    projects=data.map(p=>({...p,checks:p.checks||Array(8).fill(false)}));
+    // merge cloud data with local pdfData so attachments are preserved
+    const localMap=Object.fromEntries((projects||[]).map(p=>[p.id,p]));
+    projects=data.map(p=>({...p,pdfData:localMap[p.id]?.pdfData||p.pdfData||null,pdfName:p.pdfName||(localMap[p.id]?.pdfName)||'',checks:p.checks||Array(8).fill(false)}));
     localStorage.setItem(STORAGE_KEY,JSON.stringify(projects));
     const last=localStorage.getItem(LAST_SYNC_KEY);
     const timeStr=last?new Date(last).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}):'';
