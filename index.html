@@ -706,22 +706,48 @@ function saveLocal(){
 }
 function loadLocal(){
   try{
-    // auto-migrate from v1 to v2
+    // rescue costs/status from v1 if it still exists
     const oldKey='yofa_dashboard_v1';
     const rawOld=localStorage.getItem(oldKey);
-    if(rawOld&&!localStorage.getItem(STORAGE_KEY)){
-      const data=JSON.parse(rawOld);
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
-      localStorage.removeItem(oldKey);
-      console.log('migrated v1→v2');
+    let v1Map={};
+    if(rawOld){
+      try{
+        const v1=JSON.parse(rawOld);
+        v1.forEach(p=>{v1Map[p.id]=p;});
+        localStorage.removeItem(oldKey);
+        console.log('v1 data rescued, keys:',Object.keys(v1Map).length);
+      }catch(e){console.warn('v1 parse fail',e);}
     }
 
     const raw=localStorage.getItem(STORAGE_KEY);
     if(raw){
-      let data=JSON.parse(raw).map(p=>({...p,fileUrl:p.fileUrl||null,fileName:p.fileName||null,checks:p.checks||Array(8).fill(false)}));
-      // auto-cleanup: remove old pdfData field if present
-      const hasOldFormat=data.some(p=>'pdfData' in p);
-      if(hasOldFormat){data=data.map(({pdfData,...p})=>p);localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
+      let data=JSON.parse(raw).map(p=>{
+        const v1=v1Map[p.id];
+        return {
+          ...p,
+          // restore cost/status/note from v1 if v2 has zero/empty
+          cost:(p.cost||0)>0?p.cost:(v1?.cost||0),
+          status:p.status||v1?.status||'進行中',
+          note:p.note||(v1?.note||''),
+          fileUrl:p.fileUrl||null,
+          fileName:p.fileName||null,
+          checks:p.checks||v1?.checks||Array(8).fill(false)
+        };
+      });
+      // also add any v1 projects not in v2
+      const v2Ids=new Set(data.map(p=>p.id));
+      Object.values(v1Map).forEach(p=>{
+        if(!v2Ids.has(p.id)){const {pdfData,...rest}=p;data.push({...rest,fileUrl:null,fileName:null,checks:rest.checks||Array(8).fill(false)});}
+      });
+      // cleanup old pdfData
+      data=data.map(({pdfData,...p})=>p);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+      projects=data;
+      return true;
+    }else if(Object.keys(v1Map).length>0){
+      // v2 empty but v1 existed - use v1 directly
+      let data=Object.values(v1Map).map(({pdfData,...p})=>({...p,fileUrl:null,fileName:null,checks:p.checks||Array(8).fill(false)}));
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
       projects=data;
       return true;
     }
