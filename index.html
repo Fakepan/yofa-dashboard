@@ -123,12 +123,6 @@ tr:hover td{background:var(--surface-2)}
 .profit-cell.zero{color:var(--text-3)}
 .profit-pct-tiny{font-size:10px;color:var(--text-3);font-weight:400}
 
-.pdf-cell{display:flex;align-items:center;gap:3px}
-.dl-btn,.up-label{display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:4px 7px;border:1px solid var(--border-2);border-radius:6px;background:transparent;cursor:pointer;white-space:nowrap;font-family:inherit;color:var(--text-2)}
-.dl-btn{color:var(--info-text);border-color:var(--info-border)}
-.dl-btn:hover{background:var(--info-bg)}
-.up-label:hover{background:var(--surface-2)}
-.up-label input{display:none}
 
 .two-date{font-size:11px;line-height:1.4}
 .two-date .d2{color:var(--success-text);font-size:10px}
@@ -316,7 +310,7 @@ details.help-details summary{cursor:pointer;font-size:13px;color:var(--info-text
     <th style="width:120px">客戶</th><th>工程名稱</th>
     <th style="width:100px">收入(未稅)</th><th style="width:90px">成本</th>
     <th style="width:110px">淨利</th><th style="width:110px">狀態</th>
-    <th style="width:80px">報價單</th><th style="width:84px">操作</th>
+    <th style="width:84px">操作</th>
   </tr></thead>
   <tbody id="tbody"></tbody>
 </table></div></div>
@@ -349,9 +343,8 @@ details.help-details summary{cursor:pointer;font-size:13px;color:var(--info-text
       <div class="fr"><label class="fl">總成本（元）</label><input id="fCost" type="number" inputmode="numeric" placeholder="材料+人工+雜支" oninput="updatePreview()"><div class="hint">不知道可先空白，之後在列表編輯</div></div>
       <div class="preview-box" id="profitPreview">填入金額後，自動顯示淨利預估</div>
     </div>
-    <label class="pdf-box"><input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.jpg,.jpeg,.png" id="fPdf" onchange="previewPdf(this)"><div class="pi" id="fPdfIcon">📄</div><div class="pl">點此上傳文件（PDF、Excel、Word、圖片）</div><div class="pn" id="fPdfName"></div></label>
-    <div class="fr"><label class="fl">狀態</label><select id="fStatus"><option>進行中</option><option>待核准</option><option>結案完成</option></select></div>
-    <div class="fr"><label class="fl">備註</label><input id="fNote" placeholder="選填" autocomplete="off"></div>
+      <div class="fr"><label class="fl">狀態</label><select id="fStatus"><option>進行中</option><option>待核准</option><option>結案完成</option></select></div>
+      <div class="fr"><label class="fl">備註與文件連結</label><input id="fNote" placeholder="例：abc.pdf - https://drive.google.com/..." autocomplete="off"></div>
     <div class="mf"><button class="btn" onclick="closeMb()">取消</button><button class="btn primary" id="modal-confirm" onclick="confirmModal()">確認新增</button></div>
   </div>
 </div>
@@ -439,16 +432,16 @@ const GITHUB_DATA_PATH='data/projects.json';
 const CHECKLIST=['審查專案計劃與預算','更新施工完工文件','取得客戶完工確認簽章','索取客戶核准／驗收單','確認款項已收訖','歸檔估價單與相關圖面','舉行專案後內部檢討','交接剩餘材料與庫存'];
 
 const INITIAL_DATA=[
-  {id:'1150309PSKS6',quoteDate:'2026-03-09',startDate:'2026-03-09',client:'麗綺室內裝修工程有限公司',name:'博愛路60號3樓空調設備增設改善',amt:417291,nego:360000,taxInc:true,cost:0,status:'進行中',note:'',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
-  {id:'1150304PSKS5',quoteDate:'2026-03-04',startDate:'2026-03-04',client:'國立臺灣大學',name:'綜合體育館空調設備汰換工程',amt:149121,nego:null,taxInc:true,cost:0,status:'進行中',note:'512、513室',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
-  {id:'1150326P001',quoteDate:'2026-03-26',startDate:'2026-03-26',client:'大員昌（旅樂序重慶店）',name:'熱泵緊急搶修工程',amt:30975,nego:null,taxInc:true,cost:0,status:'進行中',note:'需另檢查頂樓水泵及溫控',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
-  {id:'1150405PS7',quoteDate:'2026-04-05',startDate:'2026-04-05',client:'大員昌（旅樂序重慶館）',name:'熱泵機房維護工程',amt:34755,nego:null,taxInc:true,cost:0,status:'進行中',note:'殼管式冷凝器藥劑清洗',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
-  {id:'1150413PS7',quoteDate:'2026-04-13',startDate:'2026-04-13',client:'大員昌（旅樂序重慶館）',name:'熱泵更新工程',amt:30692,nego:null,taxInc:true,cost:0,status:'進行中',note:'特殊電壓訂製品，交期30天',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
-  {id:'1150512PS7',quoteDate:'2026-05-12',startDate:'2026-05-12',client:'大員昌（旅樂序站前一館）',name:'恆壓泵浦變頻器更新工程',amt:50610,nego:null,taxInc:true,cost:0,status:'進行中',note:'僅保固#1號變頻器',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
-  {id:'1150520PS2',quoteDate:'2026-05-20',startDate:'2026-05-20',client:'智電系統股份有限公司',name:'冰水管修繕工程',amt:172242,nego:150000,taxInc:false,cost:0,status:'進行中',note:'議價15萬未稅',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
-  {id:'1141121KS7',quoteDate:'2025-11-21',startDate:'2026-06-16',client:'國家通訊傳播委員會',name:'濟南路辦公室空調通風改善工程',amt:219083,nego:null,taxInc:true,cost:0,status:'進行中',note:'投標案，115-06-16得標施作',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
-  {id:'1150609PS1',quoteDate:'2026-06-09',startDate:'2026-06-09',client:'國立臺灣大學',name:'禮賢樓2F學生餐廳 HITACHI VRV設備保養工程（大保養37台）',amt:142223,nego:null,taxInc:true,cost:0,status:'進行中',note:'本報價單依實際現場施作數量作為最後請款依據',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
-  {id:'1150615PS1',quoteDate:'2026-06-15',startDate:'2026-06-15',client:'國立臺灣科技大學',name:'EE大樓壁掛分離式保養工程',amt:10290,nego:null,taxInc:true,cost:0,status:'進行中',note:'蒸發器藥劑清洗、冷凝器高壓清洗等',pdfName:'',pdfData:null,checks:Array(8).fill(false)},
+  {id:'1150309PSKS6',quoteDate:'2026-03-09',startDate:'2026-03-09',client:'麗綺室內裝修工程有限公司',name:'博愛路60號3樓空調設備增設改善',amt:417291,nego:360000,taxInc:true,cost:0,status:'進行中',note:'',checks:Array(8).fill(false)},
+  {id:'1150304PSKS5',quoteDate:'2026-03-04',startDate:'2026-03-04',client:'國立臺灣大學',name:'綜合體育館空調設備汰換工程',amt:149121,nego:null,taxInc:true,cost:0,status:'進行中',note:'512、513室',checks:Array(8).fill(false)},
+  {id:'1150326P001',quoteDate:'2026-03-26',startDate:'2026-03-26',client:'大員昌（旅樂序重慶店）',name:'熱泵緊急搶修工程',amt:30975,nego:null,taxInc:true,cost:0,status:'進行中',note:'需另檢查頂樓水泵及溫控',checks:Array(8).fill(false)},
+  {id:'1150405PS7',quoteDate:'2026-04-05',startDate:'2026-04-05',client:'大員昌（旅樂序重慶館）',name:'熱泵機房維護工程',amt:34755,nego:null,taxInc:true,cost:0,status:'進行中',note:'殼管式冷凝器藥劑清洗',checks:Array(8).fill(false)},
+  {id:'1150413PS7',quoteDate:'2026-04-13',startDate:'2026-04-13',client:'大員昌（旅樂序重慶館）',name:'熱泵更新工程',amt:30692,nego:null,taxInc:true,cost:0,status:'進行中',note:'特殊電壓訂製品，交期30天',checks:Array(8).fill(false)},
+  {id:'1150512PS7',quoteDate:'2026-05-12',startDate:'2026-05-12',client:'大員昌（旅樂序站前一館）',name:'恆壓泵浦變頻器更新工程',amt:50610,nego:null,taxInc:true,cost:0,status:'進行中',note:'僅保固#1號變頻器',checks:Array(8).fill(false)},
+  {id:'1150520PS2',quoteDate:'2026-05-20',startDate:'2026-05-20',client:'智電系統股份有限公司',name:'冰水管修繕工程',amt:172242,nego:150000,taxInc:false,cost:0,status:'進行中',note:'議價15萬未稅',checks:Array(8).fill(false)},
+  {id:'1141121KS7',quoteDate:'2025-11-21',startDate:'2026-06-16',client:'國家通訊傳播委員會',name:'濟南路辦公室空調通風改善工程',amt:219083,nego:null,taxInc:true,cost:0,status:'進行中',note:'投標案，115-06-16得標施作',checks:Array(8).fill(false)},
+  {id:'1150609PS1',quoteDate:'2026-06-09',startDate:'2026-06-09',client:'國立臺灣大學',name:'禮賢樓2F學生餐廳 HITACHI VRV設備保養工程（大保養37台）',amt:142223,nego:null,taxInc:true,cost:0,status:'進行中',note:'本報價單依實際現場施作數量作為最後請款依據',checks:Array(8).fill(false)},
+  {id:'1150615PS1',quoteDate:'2026-06-15',startDate:'2026-06-15',client:'國立臺灣科技大學',name:'EE大樓壁掛分離式保養工程',amt:10290,nego:null,taxInc:true,cost:0,status:'進行中',note:'蒸發器藥劑清洗、冷凝器高壓清洗等',checks:Array(8).fill(false)},
 ];
 
 let projects=[];
@@ -540,9 +533,7 @@ async function cloudLoad(){
     if(!file)return false;
     const data=JSON.parse(fromB64(file.content));
     if(!Array.isArray(data))return false;
-    // merge cloud data with local pdfData so attachments are preserved
-    const localMap=Object.fromEntries((projects||[]).map(p=>[p.id,p]));
-    projects=data.map(p=>({...p,pdfData:localMap[p.id]?.pdfData||p.pdfData||null,pdfName:p.pdfName||(localMap[p.id]?.pdfName)||'',checks:p.checks||Array(8).fill(false)}));
+    projects=data.map(p=>({...p,checks:p.checks||Array(8).fill(false)}));
     localStorage.setItem(STORAGE_KEY,JSON.stringify(projects));
     const last=localStorage.getItem(LAST_SYNC_KEY);
     const timeStr=last?new Date(last).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}):'';
@@ -751,9 +742,6 @@ function profitPct(p){const r=revenue(p);return r>0?(profit(p)/r*100):0;}
 function fmt(n){if(n===0)return '$0';if(n==null||isNaN(n))return '-';return(n<0?'-$':'$')+Math.abs(Math.round(n)).toLocaleString();}
 function fmtK(n){if(n==null||isNaN(n))return '';return(n<0?'-':'')+'$'+Math.abs(Math.round(n)).toLocaleString();}
 function fmtDate(d){return d?d.slice(5,10).replace('-','/'):'—';}
-function fileIcon(name){if(!name)return '📄';const e=(name.split('.').pop()||'').toLowerCase();if(e==='pdf')return '📄';if(e==='xls'||e==='xlsx')return '📊';if(e==='doc'||e==='docx')return '📝';if(e==='jpg'||e==='jpeg'||e==='png')return '🖼️';return '📎';}
-function readFileAsDataUrl(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(f);});}
-function downloadPdf(idx){const p=projects[idx];if(!p.pdfData)return;const a=document.createElement('a');a.href=p.pdfData;a.download=p.pdfName||p.id+'.pdf';a.click();}
 
 // ── Search ──
 function onSearch(val){searchTerm=val.trim();document.getElementById('searchClear').style.display=searchTerm?'':'none';renderTable();}
@@ -850,7 +838,6 @@ function renderTable(){
     const isTender=p.quoteDate!==p.startDate;
     const datecell=isTender?`<div class="two-date"><div>${fmtDate(p.startDate)}</div><div class="d2">報${fmtDate(p.quoteDate)}</div></div>`:`<span style="font-size:12px">${fmtDate(p.startDate)}</span>`;
     const prCls=pr>0?'pos':(pr<0?'neg':'zero');
-    const pdfCell=p.pdfData?`<div class="pdf-cell"><button class="dl-btn" onclick="downloadPdf(${idx})">${fileIcon(p.pdfName)} ⬇</button><label class="up-label" title="重換">🔄<input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.jpg,.jpeg,.png" onchange="uploadInline(${idx},this)"></label></div>`:`<label class="up-label">📎 上傳<input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.jpg,.jpeg,.png" onchange="uploadInline(${idx},this)"></label>`;
     const checks=p.checks||Array(8).fill(false);const done=checks.filter(Boolean).length;const clTagCls=done===8?'done':(done>0?'partial':'');
     const tBadge=isTender?`<span class="badge b-new">投標</span> `:'';
     const negoTag=p.nego!=null?`<span class="nego-tag">${p.taxInc?'議含':'議未'}</span>`:'';
@@ -863,7 +850,6 @@ function renderTable(){
       <td><input class="cost-input" type="number" inputmode="numeric" value="${p.cost||''}" placeholder="0" onchange="updateCost(${idx},this.value)"></td>
       <td><div class="profit-cell ${prCls}">${fmt(pr)}</div><div class="profit-pct-tiny">${rev>0?Math.round(ppct)+'%':''}</div></td>
       <td><div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span class="cl-tag ${clTagCls}">${done}/8</span><select class="status-select" onchange="updateStatus(${idx},this.value)">${['進行中','待核准','結案完成'].map(s=>`<option ${p.status===s?'selected':''}>${s}</option>`).join('')}</select></div></td>
-      <td>${pdfCell}</td>
       <td><div class="row-actions"><button class="icon-btn" onclick="openChecklist(${idx})" title="結案清單">📋</button><button class="icon-btn" onclick="openEdit(${idx})" title="編輯">✏️</button><button class="icon-btn danger" onclick="deleteProject(${idx})" title="刪除">🗑️</button></div></td>
     </tr>`;
   }).join('');
@@ -895,7 +881,6 @@ function renderCards(rows){
       <div class="card-bottom">
         <div class="card-cost-wrap"><span>成本：</span><input class="cost-input" type="number" inputmode="numeric" value="${p.cost||''}" placeholder="0" onchange="updateCost(${idx},this.value)"></div>
         <div class="card-actions">
-          ${p.pdfData?`<button class="icon-btn" onclick="downloadPdf(${idx})">${fileIcon(p.pdfName)}⬇</button>`:`<label class="icon-btn">📎<input type="file" accept=".pdf,.xls,.xlsx,.doc,.docx,.jpg,.jpeg,.png" style="display:none" onchange="uploadInline(${idx},this)"></label>`}
           <button class="icon-btn" onclick="openChecklist(${idx})">📋</button>
           <button class="icon-btn" onclick="openEdit(${idx})">✏️</button>
           <button class="icon-btn danger" onclick="deleteProject(${idx})">🗑️</button>
@@ -906,12 +891,6 @@ function renderCards(rows){
 }
 
 // ── Actions ──
-async function uploadInline(idx,input){
-  const f=input.files[0];if(!f)return;
-  if(f.size>5*1024*1024){alert('檔案太大（超過5MB），建議壓縮後再上傳。');}
-  projects[idx].pdfData=await readFileAsDataUrl(f);projects[idx].pdfName=f.name;
-  saveLocal();renderTable();showToast('文件已上傳');
-}
 function updateCost(idx,val){
   const cost=parseFloat(val)||0;
   if(cost<0){showToast('成本不能為負數');renderTable();return;}
@@ -929,7 +908,6 @@ function setFilter(f,btn){
 }
 
 // ── Modal ──
-function previewPdf(input){const f=input.files[0];document.getElementById('fPdfName').textContent=f?f.name:'';document.getElementById('fPdfIcon').textContent=f?fileIcon(f.name):'📄';}
 function updatePreview(){
   const amt=parseFloat(document.getElementById('fAmt').value)||0;
   const nego=document.getElementById('fNego').value;const negoV=nego?parseFloat(nego):null;
@@ -948,7 +926,6 @@ function openAdd(){
   document.getElementById('fDate').value=new Date().toISOString().slice(0,10);
   document.getElementById('fStart').value='';
   document.getElementById('fStatus').value='進行中';document.getElementById('fTax').value='inc';
-  document.getElementById('fPdfName').textContent='';document.getElementById('fPdf').value='';
   document.getElementById('profitPreview').innerHTML='填入金額後，自動顯示淨利預估';
   document.getElementById('mb').classList.add('open');
 }
@@ -963,7 +940,6 @@ function openEdit(idx){
   document.getElementById('fAmt').value=p.amt||'';document.getElementById('fNego').value=p.nego!=null?p.nego:'';
   document.getElementById('fTax').value=p.taxInc?'inc':'exc';document.getElementById('fCost').value=p.cost||'';
   document.getElementById('fStatus').value=p.status||'進行中';document.getElementById('fNote').value=p.note||'';
-  document.getElementById('fPdfName').textContent=p.pdfName||'';document.getElementById('fPdf').value='';
   updatePreview();document.getElementById('mb').classList.add('open');
 }
 function closeMb(){document.getElementById('mb').classList.remove('open');}
@@ -982,12 +958,9 @@ async function confirmModal(){
   if(nego!=null&&nego>amt){showToast('議價金額不能超過報價金額');return;}
   const id=idVal||autoId();
   if(idVal){const dup=projects.some((p,i)=>p.id===idVal&&(editIdx===null||i!==editIdx));if(dup){showToast(`案號「${idVal}」已存在`);return;}}
-  const fi=document.getElementById('fPdf').files[0];
-  let pdfData=editIdx!=null?projects[editIdx].pdfData:null;let pdfName=editIdx!=null?projects[editIdx].pdfName:'';
-  if(fi){pdfData=await readFileAsDataUrl(fi);pdfName=fi.name;}
   const qd=document.getElementById('fDate').value||new Date().toISOString().slice(0,10);
   const sdRaw=document.getElementById('fStart').value;const sd=sdRaw||qd;
-  const data={id,quoteDate:qd,startDate:sd,client,name,amt,nego,taxInc:document.getElementById('fTax').value==='inc',cost,status:document.getElementById('fStatus').value,note:document.getElementById('fNote').value.trim(),pdfName,pdfData,checks:editIdx!=null?(projects[editIdx].checks||Array(8).fill(false)):Array(8).fill(false)};
+  const data={id,quoteDate:qd,startDate:sd,client,name,amt,nego,taxInc:document.getElementById('fTax').value==='inc',cost,status:document.getElementById('fStatus').value,note:document.getElementById('fNote').value.trim(),checks:editIdx!=null?(projects[editIdx].checks||Array(8).fill(false)):Array(8).fill(false)};
   if(editIdx!=null){projects[editIdx]=data;showToast('已更新');}
   else{projects.push(data);showToast(`✅ 案件 ${id} 已新增`);}
   closeMb();saveLocal();renderAll();
