@@ -308,7 +308,7 @@ details.help-details summary{cursor:pointer;font-size:13px;color:var(--info-text
   <thead><tr>
     <th style="width:104px">案號</th><th style="width:64px">日期</th>
     <th style="width:120px">客戶</th><th>工程名稱</th>
-    <th style="width:100px">收入(未稅)</th><th style="width:90px">成本</th>
+    <th style="width:110px">收入(未稅/含稅)</th><th style="width:90px">成本</th>
     <th style="width:110px">淨利</th><th style="width:110px">狀態</th>
     <th style="width:84px">操作</th>
   </tr></thead>
@@ -328,8 +328,8 @@ details.help-details summary{cursor:pointer;font-size:13px;color:var(--info-text
       <div class="fr"><label class="fl">報價日期</label><input id="fDate" type="date"></div>
     </div>
     <div class="fr"><label class="fl">施工開始日（選填）</label><input id="fStart" type="date"><div class="hint">投標案填得標後實際施工日</div></div>
-    <div class="fr"><label class="fl">客戶名稱</label><input id="fClient" placeholder="客戶公司名稱" autocomplete="off"></div>
-    <div class="fr"><label class="fl">工程名稱</label><input id="fName" placeholder="工程描述" autocomplete="off"></div>
+    <div class="fr"><label class="fl">客戶名稱</label><input id="fClient" placeholder="客戶公司名稱" list="clientList" autocomplete="off" oninput="suggestProjects()"><datalist id="clientList"></datalist></div>
+    <div class="fr"><label class="fl">工程名稱</label><input id="fName" placeholder="工程描述" list="projectList" autocomplete="off"><datalist id="projectList"></datalist></div>
     <div class="grp">
       <div class="grp-title">收入設定</div>
       <div class="fg">
@@ -881,10 +881,24 @@ function switchTab(name,btn){
   document.getElementById('tab-'+name).classList.add('active');
 }
 
+// ── Datalist autocomplete ──
+function updateDataLists(){
+  const clients=[...new Set(projects.map(p=>p.client).filter(Boolean))];
+  document.getElementById('clientList').innerHTML=clients.map(c=>`<option value="${c}">`).join('');
+  const names=[...new Set(projects.map(p=>p.name).filter(Boolean))];
+  document.getElementById('projectList').innerHTML=names.map(n=>`<option value="${n}">`).join('');
+}
+function suggestProjects(){
+  const client=document.getElementById('fClient').value.trim();
+  const pastNames=[...new Set(projects.filter(p=>p.client===client).map(p=>p.name))];
+  document.getElementById('projectList').innerHTML=pastNames.map(n=>`<option value="${n}">`).join('');
+}
+
 // ── Filtered rows ──
 function filteredRows(){
   let rows=filter==='all'?projects:filter==='range'?projects.filter(inRange):projects.filter(p=>p.status===filter);
   if(searchTerm){const q=searchTerm.toLowerCase();rows=rows.filter(p=>(p.id||'').toLowerCase().includes(q)||(p.client||'').toLowerCase().includes(q)||(p.name||'').toLowerCase().includes(q));}
+  rows=rows.slice().sort((a,b)=>(b.startDate||b.quoteDate||'').localeCompare(a.startDate||a.quoteDate||''));
   return rows;
 }
 
@@ -907,7 +921,7 @@ function renderTable(){
       <td>${datecell}</td>
       <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px" title="${p.client}">${p.client}</td>
       <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px" title="${p.name}${p.note?' · '+p.note:''}">${tBadge}${p.name}</td>
-      <td><div style="display:flex;align-items:center;gap:3px"><span style="font-size:12px">${fmt(rev)}</span>${negoTag}</div></td>
+      <td><div style="line-height:1.5">${negoTag?`<div style="margin-bottom:1px">${negoTag}</div>`:''}<div style="font-size:12px;font-weight:500">${fmt(rev)}</div><div style="font-size:10px;color:var(--text-3)">含稅 ${fmt(rev*1.05)}</div></div></td>
       <td><input class="cost-input" type="number" inputmode="numeric" value="${p.cost||''}" placeholder="0" onchange="updateCost(${idx},this.value)"></td>
       <td><div class="profit-cell ${prCls}">${fmt(pr)}</div><div class="profit-pct-tiny">${rev>0?Math.round(ppct)+'%':''}</div></td>
       <td><div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span class="cl-tag ${clTagCls}">${done}/8</span><select class="status-select" onchange="updateStatus(${idx},this.value)">${['進行中','待核准','結案完成'].map(s=>`<option ${p.status===s?'selected':''}>${s}</option>`).join('')}</select>${p.fileUrl?`<a href="${p.fileUrl}" target="_blank" style="font-size:11px;color:var(--info-text)" title="${p.fileName}">📄</a>`:''}</div></td>
@@ -935,7 +949,7 @@ function renderCards(rows){
       <div class="card-name">${tBadge}${p.name}</div>
       <div class="card-client">${p.client}${p.note?` · ${p.note}`:''}</div>
       <div class="card-nums">
-        <div><div class="card-num-label">收入(未稅)</div><div class="card-num-val info">${fmt(rev)}</div>${negoTag?`<div style="margin-top:2px">${negoTag}</div>`:''}</div>
+        <div><div class="card-num-label">收入</div><div class="card-num-val info">${fmt(rev)}</div><div style="font-size:10px;color:var(--text-3)">含稅 ${fmt(rev*1.05)}</div>${negoTag?`<div style="margin-top:2px">${negoTag}</div>`:''}</div>
         <div><div class="card-num-label">成本</div><div class="card-num-val warn">${fmt(p.cost||0)}</div></div>
         <div><div class="card-num-label">淨利</div><div class="card-num-val ${prCls}">${fmt(pr)}<br><span style="font-size:10px;font-weight:400;color:var(--text-3)">${rev>0?Math.round(ppct)+'%':''}</span></div></div>
       </div>
@@ -1019,7 +1033,7 @@ function updatePreview(){
   const cost=parseFloat(document.getElementById('fCost').value)||0;
   const gross=negoV!=null?negoV:amt;const rev=tax?gross/1.05:gross;const pr=rev-cost;const pct=rev>0?(pr/rev*100):0;
   const cls=pr>0?'pos':(pr<0?'neg':'');
-  document.getElementById('profitPreview').innerHTML=`收入（未稅）：<b>${fmt(rev)}</b>　成本：<b>${fmt(cost)}</b><br>淨利：<span class="${cls}">${fmt(pr)}</span>（毛利率 ${Math.round(pct)}%）`;
+  document.getElementById('profitPreview').innerHTML=`未稅：<b>${fmt(rev)}</b>　含稅：<b>${fmt(rev*1.05)}</b>　成本：<b>${fmt(cost)}</b><br>淨利：<span class="${cls}">${fmt(pr)}</span>　毛利率 ${Math.round(pct)}%`;
 }
 function openAdd(){
   editIdx=null;
@@ -1033,6 +1047,7 @@ function openAdd(){
   document.getElementById('fFile').value='';
   document.getElementById('fileStatus').textContent='未上傳';
   document.getElementById('profitPreview').innerHTML='填入金額後，自動顯示淨利預估';
+  updateDataLists();
   document.getElementById('mb').classList.add('open');
 }
 function openEdit(idx){
@@ -1049,6 +1064,7 @@ function openEdit(idx){
   document.getElementById('fFile').value='';
   if(p.fileUrl){document.getElementById('fileStatus').innerHTML=`✅ <a href="${p.fileUrl}" target="_blank">${p.fileName}</a>`;}
   else{document.getElementById('fileStatus').textContent='未上傳';}
+  updateDataLists();
   updatePreview();document.getElementById('mb').classList.add('open');
 }
 function closeMb(){document.getElementById('mb').classList.remove('open');}
