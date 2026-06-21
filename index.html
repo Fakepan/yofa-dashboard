@@ -423,7 +423,7 @@ details.help-details summary{cursor:pointer;font-size:13px;color:var(--info-text
 <script>
 // ── Constants ──
 const TAX_RATE=0.05;
-const STORAGE_KEY='yofa_dashboard_v1';
+const STORAGE_KEY='yofa_dashboard_v2';
 const PAT_KEY='yofa_github_pat';
 const LAST_SYNC_KEY='yofa_last_cloud_sync';
 const GITHUB_REPO='Fakepan/yofa-dashboard';
@@ -689,7 +689,14 @@ function saveLocal(){
 function loadLocal(){
   try{
     const raw=localStorage.getItem(STORAGE_KEY);
-    if(raw){projects=JSON.parse(raw).map(p=>({...p,checks:p.checks||Array(8).fill(false)}));return true;}
+    if(raw){
+      let data=JSON.parse(raw).map(p=>({...p,checks:p.checks||Array(8).fill(false)}));
+      // auto-cleanup: remove old pdfData field if present
+      const hasOldFormat=data.some(p=>'pdfData' in p);
+      if(hasOldFormat){data=data.map(({pdfData,...p})=>p);localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
+      projects=data;
+      return true;
+    }
   }catch(e){console.warn(e);}
   return false;
 }
