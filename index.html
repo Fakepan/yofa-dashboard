@@ -411,6 +411,17 @@ details.help-details summary{cursor:pointer;font-size:13px;color:var(--info-text
         </div>
       </div>
     </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+    <div class="grp">
+      <div class="grp-title">📁 本地資料夾備份（第二層保障）</div>
+      <p style="font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:10px">每次修改後自動將 <code>projects.json</code> 存到你電腦指定的資料夾。<br>需使用 Chrome 或 Edge 瀏覽器，手機不支援。</p>
+      <div id="localFolderStatus" style="font-size:13px;margin-bottom:10px"><span style="color:var(--text-3)">尚未設定</span></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="localFolderConnect" onclick="pickLocalFolder()">📂 選取資料夾</button>
+        <button class="btn danger-btn" id="localFolderDisconnect" style="display:none" onclick="disconnectLocalFolder()">🗑 解除</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -446,6 +457,7 @@ let editIdx=null;
 let searchTerm='';
 let clEditIdx=null;
 let cloudSaveTimer=null;
+let localDirHandle=null;
 
 // ── More menu ──
 function toggleMoreMenu(){document.getElementById('moreDropdown').classList.toggle('open');}
@@ -555,6 +567,7 @@ function openSyncSetup(){
     const last=localStorage.getItem(LAST_SYNC_KEY);
     document.getElementById('lastSyncTime').textContent=last?new Date(last).toLocaleString('zh-TW'):'尚未同步';
   }
+  updateLocalFolderUI();
   document.getElementById('sync-mb').classList.add('open');
 }
 function closeSyncMb(){document.getElementById('sync-mb').classList.remove('open');}
@@ -595,11 +608,88 @@ async function forceCloudLoad(){
   else{showToast('⚠️ 載入失敗，請確認 Token 是否有效');}
 }
 
+// ── IndexedDB helpers (for storing file/dir handles) ──
+function openIdb(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open('yofa_idb',1);
+    req.onupgradeneeded=e=>e.target.result.createObjectStore('handles');
+    req.onsuccess=e=>res(e.target.result);
+    req.onerror=e=>rej(e.target.error);
+  });
+}
+async function idbGet(key){
+  const db=await openIdb();
+  return new Promise((res,rej)=>{const tx=db.transaction('handles','readonly');const r=tx.objectStore('handles').get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+}
+async function idbSet(key,val){
+  const db=await openIdb();
+  return new Promise((res,rej)=>{const tx=db.transaction('handles','readwrite');tx.objectStore('handles').put(val,key);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});
+}
+async function idbDel(key){
+  const db=await openIdb();
+  return new Promise((res,rej)=>{const tx=db.transaction('handles','readwrite');tx.objectStore('handles').delete(key);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});
+}
+
+// ── Local folder backup ──
+async function pickLocalFolder(){
+  if(!window.showDirectoryPicker){showToast('此瀏覽器不支援本地資料夾（請用 Chrome 或 Edge）');return;}
+  try{
+    const handle=await window.showDirectoryPicker({mode:'readwrite'});
+    localDirHandle=handle;
+    await idbSet('localDirHandle',handle);
+    updateLocalFolderUI();
+    await localFolderSave(true);
+    showToast('✅ 本地資料夾已設定，備份完成');
+  }catch(e){if(e.name!=='AbortError')showToast('選取資料夾失敗：'+e.message);}
+}
+async function localFolderSave(silent){
+  if(!localDirHandle)return;
+  try{
+    let perm=await localDirHandle.queryPermission({mode:'readwrite'});
+    if(perm==='prompt')perm=await localDirHandle.requestPermission({mode:'readwrite'});
+    if(perm!=='granted')return;
+    const fh=await localDirHandle.getFileHandle('projects.json',{create:true});
+    const w=await fh.createWritable();
+    await w.write(JSON.stringify(projects,null,2));
+    await w.close();
+    if(!silent)updateLocalFolderUI();
+  }catch(e){console.warn('localFolderSave',e);}
+}
+async function disconnectLocalFolder(){
+  if(!confirm('確定解除本地資料夾連接？（已備份的檔案不會刪除）'))return;
+  localDirHandle=null;
+  await idbDel('localDirHandle');
+  updateLocalFolderUI();
+  showToast('已解除本地資料夾');
+}
+async function initLocalFolder(){
+  try{
+    const h=await idbGet('localDirHandle');
+    if(h){localDirHandle=h;updateLocalFolderUI();}
+  }catch(e){console.warn('initLocalFolder',e);}
+}
+function updateLocalFolderUI(){
+  const statusEl=document.getElementById('localFolderStatus');
+  const connectBtn=document.getElementById('localFolderConnect');
+  const disconnectBtn=document.getElementById('localFolderDisconnect');
+  if(!statusEl)return;
+  if(localDirHandle){
+    statusEl.innerHTML=`📁 已設定：<b>${localDirHandle.name}</b>`;
+    connectBtn.style.display='none';
+    disconnectBtn.style.display='inline-flex';
+  }else{
+    statusEl.innerHTML='<span style="color:var(--text-3)">尚未設定</span>';
+    connectBtn.style.display='inline-flex';
+    disconnectBtn.style.display='none';
+  }
+}
+
 // ── Local storage ──
 function saveLocal(){
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(projects));}
   catch(e){console.warn('localStorage 已滿',e);}
   scheduleCloudSave();
+  localFolderSave();
 }
 function loadLocal(){
   try{
@@ -905,6 +995,7 @@ function renderAll(){renderMetrics();renderAllCharts();renderTable();}
 if(!loadLocal()){projects=JSON.parse(JSON.stringify(INITIAL_DATA));saveLocal();}
 renderAll();
 initCloud();
+initLocalFolder();
 </script>
 </body>
 </html>
