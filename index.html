@@ -1042,8 +1042,7 @@ async function confirmModal(){
       fileName=uploadResult.fileName;
       showToast('✅ 檔案已上傳');
     }catch(e){
-      showToast('❌ 檔案上傳失敗：'+e.message);
-      return;
+      showToast('❌ 檔案上傳失敗，案件已保存（可稍後重新上傳）：'+e.message);
     }
   }
 
