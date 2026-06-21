@@ -706,6 +706,16 @@ function saveLocal(){
 }
 function loadLocal(){
   try{
+    // auto-migrate from v1 to v2
+    const oldKey='yofa_dashboard_v1';
+    const rawOld=localStorage.getItem(oldKey);
+    if(rawOld&&!localStorage.getItem(STORAGE_KEY)){
+      const data=JSON.parse(rawOld);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+      localStorage.removeItem(oldKey);
+      console.log('migrated v1→v2');
+    }
+
     const raw=localStorage.getItem(STORAGE_KEY);
     if(raw){
       let data=JSON.parse(raw).map(p=>({...p,fileUrl:p.fileUrl||null,fileName:p.fileName||null,checks:p.checks||Array(8).fill(false)}));
