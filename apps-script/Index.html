@@ -40,6 +40,19 @@
   .hide{display:none;}
   .link{color:var(--navy);cursor:pointer;text-decoration:underline;}
   .spin{padding:24px;text-align:center;color:var(--mut);}
+  /* 使用說明橫幅 */
+  .help{background:#eef4fb;border:1px solid #bcd4ee;color:#2a3646;border-radius:8px;padding:12px 40px 12px 14px;margin-bottom:16px;font-size:13px;line-height:1.75;position:relative;}
+  .help b{color:var(--navy);}
+  .help .x{position:absolute;top:8px;right:10px;cursor:pointer;color:#789;border:0;background:none;font-size:15px;padding:2px 4px;}
+  /* 提醒小條 */
+  .note{background:#fff8e6;border:1px solid #e7d08a;color:#6b5b1e;border-radius:6px;padding:8px 10px;font-size:12px;margin:2px 0 12px;line-height:1.6;}
+  /* 明顯可點的案號 */
+  .case-link{display:inline-flex;align-items:center;gap:3px;background:var(--lblue);color:var(--navy);border:1px solid #a9c0e0;border-radius:6px;padding:3px 9px;font-weight:600;cursor:pointer;}
+  .case-link:hover{background:#c7d6ef;}
+  /* 空表格提示 */
+  .empty-row td{text-align:center;color:var(--mut);padding:18px;background:#fbfcfe;}
+  /* 自動計算標記 */
+  .kpi .box label::after{content:" · 自動";font-size:9px;color:#9aa3b2;font-weight:normal;}
   /* 輕量提示條 */
   #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#323232;color:#fff;
     padding:10px 18px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:99;max-width:90%;}
@@ -57,6 +70,12 @@
 <main>
   <!-- 總覽 -->
   <section id="listView">
+    <div class="help" id="helpBanner">
+      <button class="x" onclick="document.getElementById('helpBanner').remove()" title="關閉說明">✕</button>
+      <b>怎麼用（3 步）</b><br>
+      ① 下方「新增案件」建立案子　→　② 點總覽裡<b>藍色的案號</b>進入該案　→　③ 在案件裡填「報價項目」和「成本記錄」。<br>
+      ⚠️ 總覽和案件上方的<b>成本、利潤、利潤率等數字都是系統自動算出來的，不能直接打字</b>。要輸入資料，請先<b>點案號進入案件</b>，再用裡面的表格和「＋新增一列 / 加入」按鈕填寫。
+    </div>
     <div class="card">
       <h2>新增案件</h2>
       <div class="row">
@@ -72,6 +91,7 @@
 
     <div class="card">
       <h2>案件總覽</h2>
+      <div class="note">👉 點藍色案號進入案件，才能填「報價項目」與「成本記錄」。下方成本、報價、利潤等欄位為系統自動計算，無法在此直接輸入。</div>
       <div id="dash" class="spin">載入中…</div>
     </div>
   </section>
@@ -87,6 +107,7 @@
         </div>
       </div>
       <div class="kpi" id="dKpi"></div>
+      <div class="note" style="margin-top:10px">☝️ 以上方塊都是<b>自動計算</b>的結果，不能直接輸入。要改數字，請到下方「報價項目」和「成本記錄」增減內容，這裡就會跟著變。</div>
       <div class="row" style="margin-top:12px;align-items:flex-end;background:#f8f9fc;padding:10px;border-radius:6px;">
         <div style="flex:0 0 150px"><label>預留成本率 %（發獎金前先扣）</label>
           <input id="rvRate" type="number" min="0" max="100" step="1" oninput="renderKpi()"></div>
@@ -116,9 +137,10 @@
         <div><label>或 歷史單價查詢</label><input id="histKw" placeholder="輸入品名關鍵字" onkeyup="histSearch()"></div>
       </div>
       <div id="histBox" class="muted"></div>
-      <div style="margin-top:10px">
-        <button class="ghost small" onclick="addQuoteRow()">＋ 新增一列</button>
-        <button class="small" id="btnSaveQuote" onclick="saveQuotes()">儲存報價</button>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button class="small" onclick="addQuoteRow()">＋ 新增一列</button>
+        <button class="small" id="btnSaveQuote" onclick="saveQuotes()">💾 儲存報價</button>
+        <span class="muted">填好或改完後，記得按「儲存報價」才會存進資料庫。</span>
       </div>
     </div>
 
@@ -183,7 +205,7 @@ function renderDash(list){
     '<th class="r">成本</th><th class="r">報價淨額</th><th class="r">帳面利潤</th>'+
     '<th class="r">預留</th><th class="r">純利潤</th><th class="c">純利潤率</th><th></th></tr></thead><tbody>';
   list.forEach(function(c){
-    h+='<tr><td><span class="link" onclick="openCase(\''+c.caseNo+'\')">'+esc(c.caseNo)+'</span></td>'+
+    h+='<tr><td><span class="case-link" onclick="openCase(\''+c.caseNo+'\')" title="點我進入案件填報價/成本">'+esc(c.caseNo)+' ▸</span></td>'+
       '<td>'+esc(c.name)+'</td><td><span class="tag">'+esc(c.type)+'</span></td>'+
       '<td class="r">'+money(c.cost)+'</td><td class="r">'+money(c.net)+'</td>'+
       '<td class="r">'+money(c.profit)+'</td>'+
@@ -269,6 +291,9 @@ function box(l,v){return '<div class="box"><label>'+l+'</label><b>'+v+'</b></div
 /* ---- 報價 ---- */
 function renderQuotes(){
   var b=document.getElementById('qBody'); b.innerHTML='';
+  if(!QUOTES.length){
+    b.innerHTML='<tr class="empty-row"><td colspan="6">還沒有報價項目 — 按下方「＋ 新增一列」開始填，或從「常用項目」帶入、上傳 PDF 讀取。</td></tr>';
+  }
   QUOTES.forEach(function(q,i){
     var tr=document.createElement('tr');
     tr.innerHTML=
@@ -384,6 +409,9 @@ function useHist(name,unit,price){ QUOTES.push({name:name,unit:unit,qty:1,price:
 /* ---- 成本 ---- */
 function renderCosts(){
   var b=document.getElementById('cBody'); b.innerHTML='';
+  if(!CUR.costs.length){
+    b.innerHTML='<tr class="empty-row"><td colspan="6">還沒有成本紀錄 — 在下方填「項目、單價」後按「加入」。</td></tr>';
+  }
   CUR.costs.forEach(function(c){
     b.innerHTML+='<tr><td>'+esc(c['項目'])+'</td><td><span class="tag">'+esc(c['分類'])+'</span></td>'+
       '<td class="r">'+c['數量']+'</td><td class="r">'+money(c['單價'])+'</td>'+
