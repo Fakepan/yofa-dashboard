@@ -180,12 +180,28 @@ function getDashboard() {
 function getCaseDetail(caseNo) {
   caseNo = String(caseNo);
   var c = rowsOf(SHEETS.CASE).filter(function (x) { return String(x['案號']) === caseNo; })[0] || {};
+  // 重要：google.script.run 無法把 Date 物件傳回前端（會整包變成 null），
+  // 所以這裡把每一列的值都轉成 JSON 安全型別（Date → 字串）再回傳。
   return {
-    info:   c,
-    costs:  rowsOf(SHEETS.COST).filter(function (x) { return String(x['案號']) === caseNo; }),
-    quotes: rowsOf(SHEETS.QUOTE).filter(function (x) { return String(x['案號']) === caseNo; }),
-    items:  rowsOf(SHEETS.ITEM)
+    info:   cleanRow_(c),
+    costs:  cleanRows_(rowsOf(SHEETS.COST).filter(function (x) { return String(x['案號']) === caseNo; })),
+    quotes: cleanRows_(rowsOf(SHEETS.QUOTE).filter(function (x) { return String(x['案號']) === caseNo; })),
+    items:  cleanRows_(rowsOf(SHEETS.ITEM))
   };
+}
+
+/* 把工作表讀回來的值轉成前端可安全接收的型別（主要處理 Date）。 */
+function cleanVal_(v) {
+  if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.toISOString();
+  return v;
+}
+function cleanRow_(o) {
+  var r = {};
+  Object.keys(o || {}).forEach(function (k) { r[k] = cleanVal_(o[k]); });
+  return r;
+}
+function cleanRows_(arr) {
+  return (arr || []).map(cleanRow_);
 }
 
 /* ---------- 寫入 ---------- */

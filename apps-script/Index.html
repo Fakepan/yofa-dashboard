@@ -241,6 +241,8 @@ function openCase(no){
   google.script.run.withSuccessHandler(renderDetail).withFailureHandler(fail()).getCaseDetail(no);
 }
 function renderDetail(d){
+  if(!d || !d.info){ toast('讀取案件資料失敗，請重新整理頁面再試一次。', true); return; }
+  d.costs=d.costs||[]; d.quotes=d.quotes||[]; d.items=d.items||[];
   CUR=d;
   var no=d.info['案號'];
   document.getElementById('listView').classList.add('hide');
