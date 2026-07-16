@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<style>
+  :root{
+    --navy:#1F4E78; --lblue:#D9E1F2; --yellow:#FFF2CC;
+    --line:#cbd5e6; --ink:#222; --mut:#667;
+    --green:#2e7d32; --amber:#c77700; --red:#c62828;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Microsoft JhengHei",system-ui,sans-serif;color:var(--ink);background:#f4f6fa;}
+  header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
+  header h1{margin:0;font-size:18px;letter-spacing:1px;}
+  header .sub{font-size:11px;opacity:.85;}
+  main{max-width:1080px;margin:0 auto;padding:16px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px;}
+  .row{display:flex;flex-wrap:wrap;gap:10px;}
+  .row > *{flex:1;min-width:130px;}
+  label{font-size:12px;color:var(--mut);display:block;margin-bottom:3px;}
+  input,select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:5px;font-size:13px;}
+  button{background:var(--navy);color:#fff;border:0;border-radius:5px;padding:8px 14px;font-size:13px;cursor:pointer;}
+  button:disabled{opacity:.55;cursor:default;}
+  button.ghost{background:#fff;color:var(--navy);border:1px solid var(--navy);}
+  button.warn{background:#fff;color:var(--red);border:1px solid var(--red);}
+  button.small{padding:4px 9px;font-size:12px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{background:var(--lblue);padding:8px 6px;text-align:left;border-bottom:2px solid var(--navy);}
+  td{padding:7px 6px;border-bottom:1px solid #eef;}
+  .r{text-align:right;} .c{text-align:center;}
+  .pill{padding:2px 8px;border-radius:12px;font-size:11px;color:#fff;}
+  .m-good{background:var(--green);} .m-mid{background:var(--amber);} .m-low{background:var(--red);}
+  .tag{background:var(--lblue);color:var(--navy);padding:2px 8px;border-radius:4px;font-size:11px;}
+  h2{font-size:15px;margin:0 0 10px;color:var(--navy);}
+  h3{font-size:13px;margin:14px 0 6px;color:var(--mut);}
+  .muted{color:var(--mut);font-size:12px;}
+  .kpi{display:flex;gap:12px;flex-wrap:wrap;}
+  .kpi .box{flex:1;min-width:120px;background:var(--yellow);border-radius:6px;padding:10px 12px;}
+  .kpi .box b{display:block;font-size:18px;}
+  .hide{display:none;}
+  .link{color:var(--navy);cursor:pointer;text-decoration:underline;}
+  .spin{padding:24px;text-align:center;color:var(--mut);}
+  /* 輕量提示條 */
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#323232;color:#fff;
+    padding:10px 18px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:99;max-width:90%;}
+  #toast.show{opacity:.95;}
+  #toast.err{background:#b3261e;}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>佑發空調 · 案件成本利潤管理</h1>
+  <div class="sub">獨立施工案件 ｜ 成本 · 利潤 · 報價單</div></div>
+  <button class="ghost" onclick="showList()">＋ 案件總覽</button>
+</header>
+
+<main>
+  <!-- 總覽 -->
+  <section id="listView">
+    <div class="card">
+      <h2>新增案件</h2>
+      <div class="row">
+        <div><label>案號</label><input id="nCaseNo" placeholder="1150701"></div>
+        <div><label>案名</label><input id="nName" placeholder="搶修 / 案件名稱"></div>
+        <div><label>客戶</label><input id="nClient"></div>
+        <div style="flex:0 0 130px"><label>類型</label>
+          <select id="nType"><option>搶修</option><option>簡易</option><option>一般</option></select>
+        </div>
+        <div style="flex:0 0 100px;align-self:flex-end"><button id="btnCreate" onclick="createCase()">新增</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>案件總覽</h2>
+      <div id="dash" class="spin">載入中…</div>
+    </div>
+  </section>
+
+  <!-- 明細 -->
+  <section id="detailView" class="hide">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 id="dTitle"></h2>
+        <div>
+          <button class="ghost small" onclick="showList()">← 返回</button>
+          <button class="small" id="btnPdf" onclick="downloadPdf()">下載 PDF 報價單</button>
+        </div>
+      </div>
+      <div class="kpi" id="dKpi"></div>
+      <div class="row" style="margin-top:12px;align-items:flex-end;background:#f8f9fc;padding:10px;border-radius:6px;">
+        <div style="flex:0 0 150px"><label>預留成本率 %（發獎金前先扣）</label>
+          <input id="rvRate" type="number" min="0" max="100" step="1" oninput="renderKpi()"></div>
+        <div style="flex:0 0 160px"><label>預留基準</label>
+          <select id="rvBase" onchange="renderKpi()"><option>成本</option><option>報價淨額</option></select></div>
+        <div style="flex:0 0 110px"><button class="small" onclick="saveReserve()">儲存設定</button></div>
+        <div class="muted" style="flex:1">純利潤 = 帳面利潤 −（基準 × %）。這是可發獎金的真正利潤。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>報價項目</h2>
+      <div class="muted" style="margin-bottom:6px">給老闆看的報價單內容。單價可從常用項目帶入、歷史查詢，或上傳舊報價單 PDF 自動讀取。</div>
+      <div class="row" style="background:#f8f9fc;padding:10px;border-radius:6px;margin-bottom:10px;align-items:flex-end">
+        <div style="flex:1"><label>上傳報價單 PDF（電子檔，佑發格式最準）</label>
+          <input type="file" id="pdfFile" accept="application/pdf"></div>
+        <div style="flex:0 0 120px"><button class="small" id="pdfBtn" onclick="uploadPdf()">讀取 PDF</button></div>
+      </div>
+      <div id="pdfPreview"></div>
+      <table><thead><tr>
+        <th>品名規格</th><th style="width:70px">單位</th><th style="width:80px">數量</th>
+        <th style="width:100px">單價</th><th style="width:110px" class="r">淨額</th><th style="width:40px"></th>
+      </tr></thead><tbody id="qBody"></tbody></table>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:0 0 200px"><label>從常用項目帶入</label>
+          <select id="itemPick" onchange="pickItem()"><option value="">—</option></select></div>
+        <div><label>或 歷史單價查詢</label><input id="histKw" placeholder="輸入品名關鍵字" onkeyup="histSearch()"></div>
+      </div>
+      <div id="histBox" class="muted"></div>
+      <div style="margin-top:10px">
+        <button class="ghost small" onclick="addQuoteRow()">＋ 新增一列</button>
+        <button class="small" id="btnSaveQuote" onclick="saveQuotes()">儲存報價</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>成本記錄</h2>
+      <div class="muted" style="margin-bottom:6px">你的真實成本（設備/材料/工資…）。只有你和老闆看得到，不會出現在報價單。</div>
+      <table><thead><tr>
+        <th>項目</th><th style="width:90px">分類</th><th style="width:70px">數量</th>
+        <th style="width:100px">單價</th><th style="width:110px" class="r">小計</th><th style="width:100px">日期</th>
+      </tr></thead><tbody id="cBody"></tbody></table>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:2"><label>項目</label><input id="cItem"></div>
+        <div style="flex:0 0 110px"><label>分類</label>
+          <select id="cCat"><option>設備</option><option>材料</option><option>耗材</option><option>工資</option><option>雜項</option></select></div>
+        <div style="flex:0 0 80px"><label>數量</label><input id="cQty" type="number" value="1"></div>
+        <div style="flex:0 0 100px"><label>單價</label><input id="cPrice" type="number"></div>
+        <div style="flex:0 0 90px;align-self:flex-end"><button class="small" id="btnCost" onclick="addCostRow()">加入</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+var CUR = null;       // 目前案件明細
+var QUOTES = [];      // 前端報價列暫存
+
+/* ---- 提示 ---- */
+var _toastTimer;
+function toast(msg, isErr){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.className='show'+(isErr?' err':'');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(function(){ t.className=''; }, isErr?4000:2200);
+}
+// 統一的失敗處理：把後端丟出的錯誤訊息顯示出來，並可選擇解鎖某顆按鈕
+function fail(btnId){
+  return function(e){
+    if(btnId){ var b=document.getElementById(btnId); if(b) b.disabled=false; }
+    toast('操作失敗：'+((e&&e.message)||e||'未知錯誤'), true);
+  };
+}
+
+/* ---- 總覽 ---- */
+function showList(){
+  document.getElementById('listView').classList.remove('hide');
+  document.getElementById('detailView').classList.add('hide');
+  loadDash();
+}
+function loadDash(){
+  document.getElementById('dash').innerHTML = '<div class="spin">載入中…</div>';
+  google.script.run
+    .withSuccessHandler(renderDash)
+    .withFailureHandler(function(e){ document.getElementById('dash').innerHTML='<div class="muted" style="color:#c62828">載入失敗：'+esc((e&&e.message)||e)+'</div>'; })
+    .getDashboard();
+}
+function marginClass(m){ return m>=0.30?'m-good':(m>=0.15?'m-mid':'m-low'); }
+function renderDash(list){
+  if(!list.length){ document.getElementById('dash').innerHTML='<div class="muted">尚無案件，先新增一筆。</div>'; return; }
+  var h='<table><thead><tr><th>案號</th><th>案名</th><th>類型</th>'+
+    '<th class="r">成本</th><th class="r">報價淨額</th><th class="r">帳面利潤</th>'+
+    '<th class="r">預留</th><th class="r">純利潤</th><th class="c">純利潤率</th><th></th></tr></thead><tbody>';
+  list.forEach(function(c){
+    h+='<tr><td><span class="link" onclick="openCase(\''+c.caseNo+'\')">'+esc(c.caseNo)+'</span></td>'+
+      '<td>'+esc(c.name)+'</td><td><span class="tag">'+esc(c.type)+'</span></td>'+
+      '<td class="r">'+money(c.cost)+'</td><td class="r">'+money(c.net)+'</td>'+
+      '<td class="r">'+money(c.profit)+'</td>'+
+      '<td class="r muted">'+(c.reserveRate?('-'+money(c.reserve)):'—')+'</td>'+
+      '<td class="r"><b>'+money(c.netProfit)+'</b></td>'+
+      '<td class="c"><span class="pill '+marginClass(c.netMargin)+'">'+(c.netMargin*100).toFixed(0)+'%</span></td>'+
+      '<td><button class="warn small" onclick="delCase(\''+c.caseNo+'\')">刪</button></td></tr>';
+  });
+  h+='</tbody></table>';
+  document.getElementById('dash').innerHTML=h;
+}
+function createCase(){
+  var o={caseNo:val('nCaseNo'),name:val('nName'),client:val('nClient'),type:val('nType')};
+  if(!o.caseNo){toast('請輸入案號',true);return;}
+  var btn=document.getElementById('btnCreate'); btn.disabled=true;
+  google.script.run
+    .withSuccessHandler(function(){
+      btn.disabled=false;
+      ['nCaseNo','nName','nClient'].forEach(function(id){document.getElementById(id).value='';});
+      toast('已新增案件'); loadDash();
+    })
+    .withFailureHandler(fail('btnCreate'))
+    .addCase(o);
+}
+function delCase(no){
+  if(!confirm('確定刪除案件 '+no+'？（含成本與報價）'))return;
+  google.script.run.withSuccessHandler(function(){ toast('已刪除'); loadDash(); })
+    .withFailureHandler(fail()).deleteCase(no);
+}
+
+/* ---- 明細 ---- */
+function openCase(no){
+  google.script.run.withSuccessHandler(renderDetail).withFailureHandler(fail()).getCaseDetail(no);
+}
+function renderDetail(d){
+  CUR=d;
+  var no=d.info['案號'];
+  document.getElementById('listView').classList.add('hide');
+  document.getElementById('detailView').classList.remove('hide');
+  document.getElementById('dTitle').textContent=no+'　'+(d.info['案名']||'');
+
+  QUOTES=d.quotes.map(function(q){return{name:q['品名規格'],unit:q['單位'],qty:q['數量'],price:q['單價']};});
+  renderQuotes(); renderCosts();
+
+  // 常用項目下拉
+  var sel=document.getElementById('itemPick');
+  sel.innerHTML='<option value="">—</option>';
+  d.items.forEach(function(it,i){
+    sel.innerHTML+='<option value="'+i+'">'+esc(it['品名規格'])+'（'+money(it['參考單價'])+'）</option>';
+  });
+  sel._items=d.items;
+
+  // 帶入此案的預留成本設定
+  document.getElementById('rvRate').value = Number(d.info['預留成本率']||0) || '';
+  document.getElementById('rvBase').value = d.info['預留基準'] || '成本';
+  renderKpi();
+}
+function renderKpi(){
+  var cost=CUR.costs.reduce(function(s,x){return s+Number(x['小計']||0);},0);
+  var net=QUOTES.reduce(function(s,q){return s+Number(q.qty||0)*Number(q.price||0);},0);
+  var tax=Math.round(net*0.05), profit=net-cost;
+  var rate=Number(val('rvRate')||0);
+  var base=document.getElementById('rvBase').value==='報價淨額'?net:cost;
+  var reserve=Math.round(base*rate/100);
+  var netProfit=profit-reserve;
+  var netMargin=net>0?netProfit/net:0;
+  document.getElementById('dKpi').innerHTML=
+    box('報價未稅',money(net))+box('營業稅5%',money(tax))+box('含稅總計',money(net+tax))+
+    box('成本',money(cost))+box('帳面利潤',money(profit))+
+    box('預留成本（'+rate+'%）','-'+money(reserve))+
+    '<div class="box" style="background:#e8f5e9"><label>純利潤（發獎金）</label><b>'+money(netProfit)+'</b></div>'+
+    '<div class="box" style="background:#e8f5e9"><label>純利潤率</label><b><span class="pill '+marginClass(netMargin)+'">'+(netMargin*100).toFixed(0)+'%</span></b></div>';
+}
+function saveReserve(){
+  var rate=Number(val('rvRate')||0);
+  var base=document.getElementById('rvBase').value;
+  google.script.run.withSuccessHandler(function(){toast('預留設定已儲存');})
+    .withFailureHandler(fail())
+    .saveReserve(CUR.info['案號'],rate,base);
+}
+function box(l,v){return '<div class="box"><label>'+l+'</label><b>'+v+'</b></div>';}
+
+/* ---- 報價 ---- */
+function renderQuotes(){
+  var b=document.getElementById('qBody'); b.innerHTML='';
+  QUOTES.forEach(function(q,i){
+    var tr=document.createElement('tr');
+    tr.innerHTML=
+      '<td><input value="'+attr(q.name)+'" oninput="upd('+i+',\'name\',this.value)"></td>'+
+      '<td><input value="'+attr(q.unit||'式')+'" oninput="upd('+i+',\'unit\',this.value)"></td>'+
+      '<td><input type="number" value="'+(q.qty||1)+'" oninput="upd('+i+',\'qty\',this.value)"></td>'+
+      '<td><input type="number" value="'+(q.price||0)+'" oninput="upd('+i+',\'price\',this.value)"></td>'+
+      '<td class="r">'+money((q.qty||0)*(q.price||0))+'</td>'+
+      '<td><button class="warn small" onclick="rmQuote('+i+')">×</button></td>';
+    b.appendChild(tr);
+  });
+  renderKpi&&renderKpi();
+}
+function upd(i,k,v){ QUOTES[i][k]=(k==='name'||k==='unit')?v:Number(v); if(k==='qty'||k==='price'){recalcRow(i);} else {renderKpi();} }
+// 只更新該列淨額與 KPI，避免每次打字都重繪整張表（游標不會亂跳）
+function recalcRow(i){
+  var q=QUOTES[i];
+  var cell=document.querySelectorAll('#qBody tr')[i];
+  if(cell){ cell.children[4].textContent=money((q.qty||0)*(q.price||0)); }
+  renderKpi();
+}
+function addQuoteRow(){ QUOTES.push({name:'',unit:'式',qty:1,price:0}); renderQuotes(); }
+function rmQuote(i){ QUOTES.splice(i,1); renderQuotes(); }
+function pickItem(){
+  var sel=document.getElementById('itemPick'); var i=sel.value; if(i==='')return;
+  var it=sel._items[i];
+  QUOTES.push({name:it['品名規格'],unit:it['單位']||'式',qty:1,price:Number(it['參考單價'])});
+  sel.value=''; renderQuotes();
+}
+
+/* ---- PDF 讀取 ---- */
+var PDFROWS=[];
+function uploadPdf(){
+  var f=document.getElementById('pdfFile').files[0];
+  if(!f){toast('請先選一個 PDF',true);return;}
+  var btn=document.getElementById('pdfBtn'); btn.disabled=true; btn.textContent='讀取中…';
+  document.getElementById('pdfPreview').innerHTML='<div class="spin">辨識中，電子檔約需 5–15 秒…</div>';
+  var reader=new FileReader();
+  reader.onload=function(){
+    var b64=reader.result.split(',')[1];
+    google.script.run
+      .withSuccessHandler(function(res){ btn.disabled=false; btn.textContent='讀取 PDF'; renderPdfPreview(res.rows); })
+      .withFailureHandler(function(e){ btn.disabled=false; btn.textContent='讀取 PDF';
+        document.getElementById('pdfPreview').innerHTML='<div class="muted" style="color:#c62828">讀取失敗：'+esc((e&&e.message)||e)+'</div>'; })
+      .parseQuotePdf(b64,f.name);
+  };
+  reader.readAsDataURL(f);
+}
+function renderPdfPreview(rows){
+  PDFROWS=rows||[];
+  if(!PDFROWS.length){
+    document.getElementById('pdfPreview').innerHTML='<div class="muted">沒抓到可辨識的報價列。可能格式較特殊，請手動輸入。</div>';return;
+  }
+  var h='<div class="card" style="background:#fffdf5;border:1px solid #e0c97a">'+
+    '<h3 style="margin-top:0">讀取結果（請核對後再入庫）</h3>'+
+    '<table><thead><tr><th>品名規格</th><th style="width:60px">單位</th><th style="width:70px">數量</th>'+
+    '<th style="width:90px">單價</th><th style="width:40px"></th></tr></thead><tbody>';
+  PDFROWS.forEach(function(r,i){
+    h+='<tr>'+
+      '<td><input value="'+attr(r.name)+'" oninput="pdfUpd('+i+',\'name\',this.value)"></td>'+
+      '<td><input value="'+attr(r.unit||'式')+'" oninput="pdfUpd('+i+',\'unit\',this.value)"></td>'+
+      '<td><input type="number" value="'+(r.qty||1)+'" oninput="pdfUpd('+i+',\'qty\',this.value)"></td>'+
+      '<td><input type="number" value="'+(r.price||0)+'" oninput="pdfUpd('+i+',\'price\',this.value)"></td>'+
+      '<td><button class="warn small" onclick="pdfRm('+i+')">×</button></td></tr>';
+  });
+  h+='</tbody></table>'+
+    '<div style="margin-top:10px">'+
+    '<button class="small" onclick="pdfToQuote()">帶進本案報價</button> '+
+    '<button class="ghost small" onclick="pdfToHistory()">存進歷史庫</button> '+
+    '<button class="ghost small" onclick="document.getElementById(\'pdfPreview\').innerHTML=\'\'">關閉</button>'+
+    '<span class="muted" style="margin-left:8px">兩個都按 = 同時入庫</span></div></div>';
+  document.getElementById('pdfPreview').innerHTML=h;
+}
+function pdfUpd(i,k,v){ PDFROWS[i][k]=(k==='name'||k==='unit')?v:Number(v); }
+function pdfRm(i){ PDFROWS.splice(i,1); renderPdfPreview(PDFROWS); }
+function pdfToQuote(){
+  var n=0;
+  PDFROWS.forEach(function(r){ if(r.name){ QUOTES.push({name:r.name,unit:r.unit||'式',qty:r.qty||1,price:r.price||0}); n++; } });
+  renderQuotes(); toast('已帶進本案報價（'+n+' 項），記得按「儲存報價」。');
+}
+function pdfToHistory(){
+  google.script.run.withSuccessHandler(function(){ toast('已存進歷史庫，之後可用歷史單價查詢帶入。'); })
+    .withFailureHandler(fail())
+    .importToHistory(PDFROWS);
+}
+function saveQuotes(){
+  var btn=document.getElementById('btnSaveQuote'); btn.disabled=true;
+  google.script.run.withSuccessHandler(function(){btn.disabled=false;toast('報價已儲存');})
+    .withFailureHandler(fail('btnSaveQuote'))
+    .saveQuoteItems(CUR.info['案號'],QUOTES);
+}
+
+/* ---- 歷史查詢 ---- */
+var histTimer;
+function histSearch(){
+  clearTimeout(histTimer);
+  var kw=val('histKw');
+  if(!kw){document.getElementById('histBox').innerHTML='';return;}
+  histTimer=setTimeout(function(){
+    google.script.run.withSuccessHandler(function(res){
+      if(!res.length){document.getElementById('histBox').innerHTML='<span class="muted">無歷史紀錄</span>';return;}
+      var h='歷史單價：';
+      res.forEach(function(r){
+        h+='<span class="tag" style="cursor:pointer;margin:2px" onclick="useHist(\''+attr(r.name)+'\',\''+attr(r.unit)+'\','+r.price+')">'+
+           esc(r.name)+' '+money(r.price)+'（'+esc(r.caseNo)+'）</span> ';
+      });
+      document.getElementById('histBox').innerHTML=h;
+    }).withFailureHandler(fail()).searchHistoryPrice(kw);
+  },300);
+}
+function useHist(name,unit,price){ QUOTES.push({name:name,unit:unit,qty:1,price:price}); renderQuotes(); }
+
+/* ---- 成本 ---- */
+function renderCosts(){
+  var b=document.getElementById('cBody'); b.innerHTML='';
+  CUR.costs.forEach(function(c){
+    b.innerHTML+='<tr><td>'+esc(c['項目'])+'</td><td><span class="tag">'+esc(c['分類'])+'</span></td>'+
+      '<td class="r">'+c['數量']+'</td><td class="r">'+money(c['單價'])+'</td>'+
+      '<td class="r">'+money(c['小計'])+'</td><td>'+fmtD(c['記錄日期'])+'</td></tr>';
+  });
+}
+function addCostRow(){
+  var o={caseNo:CUR.info['案號'],item:val('cItem'),category:val('cCat'),
+         qty:Number(val('cQty')),price:Number(val('cPrice'))};
+  if(!o.item){toast('請輸入項目',true);return;}
+  var btn=document.getElementById('btnCost'); btn.disabled=true;
+  google.script.run.withSuccessHandler(function(){
+    google.script.run.withSuccessHandler(function(d){
+      btn.disabled=false;
+      CUR.costs=d.costs; ['cItem','cPrice'].forEach(function(id){document.getElementById(id).value='';});
+      renderCosts(); renderKpi(); toast('已加入成本');
+    }).withFailureHandler(fail('btnCost')).getCaseDetail(o.caseNo);
+  }).withFailureHandler(fail('btnCost')).addCost(o);
+}
+
+/* ---- PDF ---- */
+function downloadPdf(){
+  var btn=document.getElementById('btnPdf'); btn.disabled=true; var txt=btn.textContent; btn.textContent='產生中…';
+  google.script.run.withSuccessHandler(function(res){
+    btn.disabled=false; btn.textContent=txt;
+    var a=document.createElement('a');
+    a.href='data:application/pdf;base64,'+res.b64;
+    a.download=res.name; a.click();
+  }).withFailureHandler(function(e){ btn.disabled=false; btn.textContent=txt; fail()(e); })
+    .makeQuotePdf(CUR.info['案號']);
+}
+
+/* ---- utils ---- */
+function val(id){return document.getElementById(id).value.trim();}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function attr(s){return esc(s).replace(/"/g,'&quot;');}
+function money(n){return Math.round(Number(n||0)).toLocaleString('en-US');}
+function fmtD(d){ if(!d)return''; var x=new Date(d); if(isNaN(x))return'';
+  return (x.getFullYear()-1911)+'/'+('0'+(x.getMonth()+1)).slice(-2)+'/'+('0'+x.getDate()).slice(-2);}
+
+showList();
+</script>
+</body>
+</html>
