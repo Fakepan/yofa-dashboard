@@ -332,20 +332,42 @@ function pdfToText_(b64, fileName) {
  * 欄位叫 name），舊專案/教學常見的是 v2（方法叫 insert、欄位叫 title）。
  * 兩者用起來很像但不相容，這裡自動偵測目前專案裝的是哪一版，避免因為
  * 版本不同就整個 PDF 讀取功能報錯。
+ *
+ * ocrLanguage 也依序嘗試多種代碼：Google OCR（Vision API）的語言代碼用的是
+ * 'zh-Hant'（繁體中文的腳本代碼），不是 Google 翻譯常用的 'zh-TW'（地區代碼），
+ * 兩者格式不同、傳錯會被 Google 判定為 Invalid Value 而整批拒絕。為了不讓
+ * 這種代碼落差再度讓功能整個失敗，這裡由最準確的代碼開始逐一嘗試，
+ * 任一種成功就直接採用；真的全部失敗才把 Google 回傳的原始錯誤訊息丟出來，
+ * 讓問題一次看得到根本原因。
  */
 function driveCreateOcrFile_(blob, title) {
   if (typeof Drive === 'undefined' || !Drive.Files) {
     throw new Error('尚未啟用 Drive API 服務，請到 Apps Script 左側「服務」→「＋」加入 Drive API 後再試一次。');
   }
   var mimeType = 'application/vnd.google-apps.document';
-  var options = { ocr: true, ocrLanguage: 'zh-TW' };
-  if (typeof Drive.Files.create === 'function') {          // Drive API v3
-    return Drive.Files.create({ name: title, mimeType: mimeType }, blob, options);
+  var isV3 = typeof Drive.Files.create === 'function';
+  var isV2 = !isV3 && typeof Drive.Files.insert === 'function';
+  if (!isV3 && !isV2) {
+    throw new Error('Drive API 服務版本無法辨識，請重新加入「服務」中的 Drive API。');
   }
-  if (typeof Drive.Files.insert === 'function') {           // Drive API v2
-    return Drive.Files.insert({ title: title, mimeType: mimeType }, blob, options);
+
+  var langAttempts = [
+    { ocr: true, ocrLanguage: 'zh-Hant' },  // 繁體中文（Vision API 腳本代碼，優先）
+    { ocr: true, ocrLanguage: 'zh' },       // 中文（不分繁簡）
+    { ocr: true }                           // 交給 Google 自動判斷語言
+  ];
+  var lastErr = null;
+  for (var i = 0; i < langAttempts.length; i++) {
+    try {
+      if (isV3) {
+        return Drive.Files.create({ name: title, mimeType: mimeType }, blob, langAttempts[i]);
+      }
+      return Drive.Files.insert({ title: title, mimeType: mimeType }, blob, langAttempts[i]);
+    } catch (e) {
+      lastErr = e;
+    }
   }
-  throw new Error('Drive API 服務版本無法辨識，請重新加入「服務」中的 Drive API。');
+  throw new Error('PDF 轉換失敗（Google Drive 拒絕請求）：' + (lastErr && lastErr.message ? lastErr.message : lastErr));
 }
 
 /**
