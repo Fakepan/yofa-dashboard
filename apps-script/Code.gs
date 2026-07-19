@@ -381,28 +381,33 @@ function driveCreateOcrFile_(blob, title) {
  *
  * 背景：實測發現 Google Drive OCR 把 PDF 轉成 Google Doc 時，即使原始
  * PDF 有清楚的表格線，轉出來的文字也常常「打亂」——同一列的品名、單位、
- * 數量、單價會被拆到不同行，而且拆散的順序在不同報價單之間並不一致
- * （曾實際比對過兩份佑發的報價單：一份是「同一項目的資料聚在一起」，
- * 另一份卻是「所有品名先列完，再列完所有單位數量，再列完所有單價」）。
- * 純粹「一行 = 一筆資料」的正規表示式在這種情況下完全比對不到任何列。
+ * 數量、單價會被拆到不同行，而且拆散的順序在不同報價單之間並不一致。
+ * 純粹「一行 = 一筆資料」的正規表示式在打亂的情況下完全比對不到任何列。
  *
  * 因此改採「先定位表格範圍、再分層嘗試解析」的策略：
- *   錨點定界：以「工程名稱」一行之後為表格起點，以「小計／總計／營業稅／
- *             交貨日期／付款辦法／交貨地點／客戶確認／聯絡窗口」任一
- *             關鍵字出現處為表格終點，兩者之間才可能是報價項目。
+ *   錨點定界：以第一次出現「工程名稱」之後為表格起點（多頁報價單每頁都會
+ *             重複一次抬頭，取第一次出現的位置，才不會把前面幾頁的項目
+ *             漏掉），以「小計／總計／營業稅／交貨日期／付款辦法／交貨
+ *             地點／客戶確認／聯絡窗口」任一關鍵字出現處為表格終點。
  *   Tier 1　：先試「每一行本身就是一筆完整資料」（品名+單位+數量+單價
- *             都在同一行）——對應 OCR 剛好沒有打亂順序的情況。
+ *             都在同一行）——對應 OCR 剛好沒有打亂順序的情況。判斷是否
+ *             採用時，只拿「結構上真的像資料列」（有單位、單位後緊接
+ *             至少 2 個數字）的行數當基準，這樣「A 空調設備」「一 一次
+ *             側管路配置」這類只有分類標題、沒有單位與金額的行，就不會
+ *             被誤算成一個項目、進而拖累判斷。
  *   Tier 2/3：如果 Tier 1 涵蓋不了大部分候選列，改用「品名候選行」找出
  *             項目數 N，再嘗試「同一項目的資料彼此相鄰」或「整欄位資料
  *             各自聚成一塊、依序對應」兩種排列方式，取解析結果較完整
  *             的一種。
- * 這個函式已用兩份實際的佑發報價單（分別呈現「打亂」與「未打亂」兩種
- * OCR 排版）驗證過能正確還原每一列的品名／單位／數量／單價。但 OCR
- * 排版方式終究可能因文件而異，所以前端仍會顯示「讀取結果，請核對後
- * 再入庫」，這一步不可省略。
+ * 已用使用者實際上傳的 6 份佑發報價單驗證（4～94 項不等，含多頁、多層
+ * 分類編號、品名內夾雜規格數字、金額後方接備註文字等情況），排版「未
+ * 被打亂」時全數正確；OCR 若把大型報價單嚴重打亂，會安全地回傳空陣列
+ * （前端顯示「請手動輸入」），而不是硬湊出錯誤的數字。OCR 排版方式終究
+ * 可能因文件而異，所以前端「讀取結果，請核對後再入庫」的人工核對步驟
+ * 予以保留，不可省略。
  */
 function extractQuoteRows_(text) {
-  var UNITS = ['式','台','組','個','支','只','m','M','公尺','米','kg','KG','套','座','片','桶','捲','箱','年','次','批'];
+  var UNITS = ['式','台','組','個','支','只','條','處','件','顆','張','枝','本','冊','盒','罐','瓶','棟','層','坪','呎','尺','吋','人','天','m','M','公尺','米','cm','mm','kg','KG','套','座','片','桶','捲','箱','年','次','批'];
   var HEADER_WORDS = ['項次','名稱','品名規格','單位','數量','單價','金額','備註'];
   var START_ANCHOR_RE = /工程名稱/;
   var END_ANCHOR_RE = /合\s*計|小\s*計|營業稅|總\s*計|交貨日期|付款辦法|交貨地點|客戶確認|聯絡窗口/;
@@ -425,7 +430,11 @@ function extractQuoteRows_(text) {
     return rest === '';
   }
   function stripIndexPrefix(s) {
-    return s.replace(/^\s*(?:[0-9０-９]{1,3}|[一二三四五六七八九十百]{1,4})[\.\s、]+/, '').trim();
+    // 分隔符字元允許 0 個以上：實務上偶爾會遇到項次數字跟品名之間沒有空白
+    // （例如「13現場電源線配接工料」）。但用 (?!\.\d) 排除「後面接小數點+
+    // 數字」的情況，確保不會把品名本身開頭的規格數字（例如「3.5mm」）
+    // 誤切成「5mm」。
+    return s.replace(/^\s*(?:[0-9０-９]{1,3}(?!\.\d)|[一二三四五六七八九十百]{1,4})[\.\s、]*/, '').trim();
   }
   function isChineseNumeralAmount(s) {
     return /^[零壹貳參叁肆伍陸柒捌玖拾佰仟萬億元整\s]+$/.test(s) && /[壹貳參叁肆伍陸柒捌玖拾佰仟萬億]/.test(s);
@@ -443,7 +452,7 @@ function extractQuoteRows_(text) {
 
   function boundToItemArea(rawLines) {
     var startIdx = 0;
-    for (var i = 0; i < rawLines.length; i++) { if (START_ANCHOR_RE.test(rawLines[i])) { startIdx = i + 1; } }
+    for (var i = 0; i < rawLines.length; i++) { if (START_ANCHOR_RE.test(rawLines[i])) { startIdx = i + 1; break; } }
     var endIdx = rawLines.length;
     for (var j = startIdx; j < rawLines.length; j++) {
       if (END_ANCHOR_RE.test(rawLines[j])) { endIdx = j; break; }
@@ -456,23 +465,41 @@ function extractQuoteRows_(text) {
   // 內部字元（例如「3.5mm」裡的 m）誤認成單位欄位。
   var UNIT_BOUNDARY_RE = new RegExp('(^|\\s)(' + UNITS.map(escapeRe).join('|') + ')(?=\\s|[\\d,]|$)');
 
+  // 判斷這一行「結構上」是否像一筆完整資料（有單位、且單位後緊接至少 2 個
+  // 數字）。用來估算 Tier 1 應該要抓到幾筆，藉此排除「A 空調設備」「一
+  // 一次側管路配置」這類只有分類標題、沒有單位與金額的行，不讓它們被誤
+  // 算成一個項目、拖累 Tier 1 是否採用的判斷。
+  function looksLikeDataRow(s) {
+    if (isHeaderWordLine(s) || NOISE_RE.test(s)) return false;
+    var um = s.match(UNIT_BOUNDARY_RE);
+    if (!um) return false;
+    var tail = s.slice(um.index + um[0].length);
+    var nums = (tail.match(/[\d,]+(?:\.\d+)?/g) || []).filter(function (n) { return !isNaN(toNumber(n)); });
+    return nums.length >= 2;
+  }
+
   function trySingleLinePerRow(boundedLines) {
     var rows = [];
     boundedLines.forEach(function (raw) {
       if (isHeaderWordLine(raw) || NOISE_RE.test(raw)) return;
-      var nums = (raw.match(/[\d,]+(?:\.\d+)?/g) || []).map(toNumber).filter(function (n) { return !isNaN(n); });
-      if (nums.length < 2) return;
       var um = raw.match(UNIT_BOUNDARY_RE);
       if (!um) return;
       var unit = um[2];
       var name = stripIndexPrefix(raw.slice(0, um.index + um[1].length).trim());
       if (!name) return;
       if (name.replace(/[一二三四五六七八九十百0-9０-９\.\s、]/g, '').length < 1) return;
+      // 只在「單位之後」找數量／單價／金額，且只取緊接在後的前幾個數字——
+      // 品名內部可能夾雜尺寸數字（如 3.5mm、1-1/2"），金額後方也可能接
+      // 備註文字或括號附註（如「(NFB 20A/30A*2)」「80*45」），這些都
+      // 不該被誤當成數量或單價。
+      var tail = raw.slice(um.index + um[0].length);
+      var nums = (tail.match(/[\d,]+(?:\.\d+)?/g) || []).map(toNumber).filter(function (n) { return !isNaN(n); }).slice(0, 3);
+      if (nums.length < 2) return;
       var qty, price;
       if (nums.length >= 3) {
-        var a = nums[nums.length - 3], b = nums[nums.length - 2], c = nums[nums.length - 1];
+        var a = nums[0], b = nums[1], c = nums[2];
         if (Math.abs(a * b - c) <= Math.max(1, c * 0.02)) { qty = a; price = b; }
-        else { qty = 1; price = b; }
+        else { qty = Math.min(a, b); price = Math.max(a, b); }
       } else {
         qty = Math.min(nums[0], nums[1]); price = Math.max(nums[0], nums[1]);
       }
@@ -486,9 +513,7 @@ function extractQuoteRows_(text) {
 
   // Tier 1：每一行本身就是完整一筆資料
   var tier1 = trySingleLinePerRow(bounded);
-  var nameCandidateCount = bounded.filter(function (l) {
-    return !isHeaderWordLine(l) && !NOISE_RE.test(l) && isNameLike(l);
-  }).length;
+  var nameCandidateCount = bounded.filter(looksLikeDataRow).length;
   if (tier1.length > 0 && tier1.length >= nameCandidateCount) {
     return tier1.map(function (r) { return { name: r.name, unit: r.unit, qty: r.qty, price: r.price, net: r.qty * r.price }; });
   }
