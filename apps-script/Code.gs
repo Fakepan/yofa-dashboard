@@ -317,8 +317,7 @@ function pdfToText_(b64, fileName) {
   var bytes = Utilities.base64Decode(b64);
   var blob = Utilities.newBlob(bytes, 'application/pdf', fileName || 'upload.pdf');
   // 用 Drive 進階服務把 PDF 轉成 Google Doc（會做文字辨識），讀完即刪
-  var resource = { title: (fileName || 'tmp') + '_ocr', mimeType: 'application/vnd.google-apps.document' };
-  var file = Drive.Files.insert(resource, blob, { ocr: true, ocrLanguage: 'zh-TW' });
+  var file = driveCreateOcrFile_(blob, (fileName || 'tmp') + '_ocr');
   var text = '';
   try {
     text = DocumentApp.openById(file.id).getBody().getText();
@@ -326,6 +325,27 @@ function pdfToText_(b64, fileName) {
     try { Drive.Files.remove(file.id); } catch (e) {}
   }
   return text;
+}
+
+/**
+ * 「服務」裡加 Drive API 時，Apps Script 新專案預設會給 v3（方法叫 create、
+ * 欄位叫 name），舊專案/教學常見的是 v2（方法叫 insert、欄位叫 title）。
+ * 兩者用起來很像但不相容，這裡自動偵測目前專案裝的是哪一版，避免因為
+ * 版本不同就整個 PDF 讀取功能報錯。
+ */
+function driveCreateOcrFile_(blob, title) {
+  if (typeof Drive === 'undefined' || !Drive.Files) {
+    throw new Error('尚未啟用 Drive API 服務，請到 Apps Script 左側「服務」→「＋」加入 Drive API 後再試一次。');
+  }
+  var mimeType = 'application/vnd.google-apps.document';
+  var options = { ocr: true, ocrLanguage: 'zh-TW' };
+  if (typeof Drive.Files.create === 'function') {          // Drive API v3
+    return Drive.Files.create({ name: title, mimeType: mimeType }, blob, options);
+  }
+  if (typeof Drive.Files.insert === 'function') {           // Drive API v2
+    return Drive.Files.insert({ title: title, mimeType: mimeType }, blob, options);
+  }
+  throw new Error('Drive API 服務版本無法辨識，請重新加入「服務」中的 Drive API。');
 }
 
 /**
