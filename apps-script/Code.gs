@@ -310,7 +310,13 @@ function searchHistoryPrice(keyword) {
  */
 function parseQuotePdf(b64, fileName) {
   var text = pdfToText_(b64, fileName);
-  return { text: text, rows: extractQuoteRows_(text) };
+  // 把 OCR 出來的原始文字整段記到「執行記錄」，日後報價單格式跑掉時
+  // 可以直接從 Apps Script 左側「執行記錄」複製這段文字回報，才知道
+  // 真正的問題出在哪一種排版上。
+  Logger.log('=== parseQuotePdf 原始 OCR 文字（%s）===\n%s', fileName || '(未命名)', text);
+  var rows = extractQuoteRows_(text);
+  Logger.log('=== 解析出 %s 筆報價列 ===\n%s', rows.length, JSON.stringify(rows));
+  return { text: text, rows: rows };
 }
 
 function pdfToText_(b64, fileName) {
@@ -371,53 +377,182 @@ function driveCreateOcrFile_(blob, title) {
 }
 
 /**
- * 從文字抽出報價列。策略：逐行掃描，抓「品名 … 單位 數量 單價 淨額」樣式，
- * 以「行內至少有兩個數字、且最後一個數字≈前兩個相乘」判斷是報價明細列。
+ * 從 OCR 文字抽出報價列。
+ *
+ * 背景：實測發現 Google Drive OCR 把 PDF 轉成 Google Doc 時，即使原始
+ * PDF 有清楚的表格線，轉出來的文字也常常「打亂」——同一列的品名、單位、
+ * 數量、單價會被拆到不同行，而且拆散的順序在不同報價單之間並不一致
+ * （曾實際比對過兩份佑發的報價單：一份是「同一項目的資料聚在一起」，
+ * 另一份卻是「所有品名先列完，再列完所有單位數量，再列完所有單價」）。
+ * 純粹「一行 = 一筆資料」的正規表示式在這種情況下完全比對不到任何列。
+ *
+ * 因此改採「先定位表格範圍、再分層嘗試解析」的策略：
+ *   錨點定界：以「工程名稱」一行之後為表格起點，以「小計／總計／營業稅／
+ *             交貨日期／付款辦法／交貨地點／客戶確認／聯絡窗口」任一
+ *             關鍵字出現處為表格終點，兩者之間才可能是報價項目。
+ *   Tier 1　：先試「每一行本身就是一筆完整資料」（品名+單位+數量+單價
+ *             都在同一行）——對應 OCR 剛好沒有打亂順序的情況。
+ *   Tier 2/3：如果 Tier 1 涵蓋不了大部分候選列，改用「品名候選行」找出
+ *             項目數 N，再嘗試「同一項目的資料彼此相鄰」或「整欄位資料
+ *             各自聚成一塊、依序對應」兩種排列方式，取解析結果較完整
+ *             的一種。
+ * 這個函式已用兩份實際的佑發報價單（分別呈現「打亂」與「未打亂」兩種
+ * OCR 排版）驗證過能正確還原每一列的品名／單位／數量／單價。但 OCR
+ * 排版方式終究可能因文件而異，所以前端仍會顯示「讀取結果，請核對後
+ * 再入庫」，這一步不可省略。
  */
 function extractQuoteRows_(text) {
-  var lines = String(text || '').split(/\r?\n/);
-  var units = ['式','台','組','個','支','只','m','M','公尺','米','kg','KG','套','座','片','桶','捲','箱','年','次'];
-  var out = [];
-  lines.forEach(function (line) {
-    var raw = line.trim();
-    if (!raw) return;
-    if (/合計|小計|營業稅|總計|報價單|承辦|電話|信箱|項次|品名/.test(raw)) return;
+  var UNITS = ['式','台','組','個','支','只','m','M','公尺','米','kg','KG','套','座','片','桶','捲','箱','年','次','批'];
+  var HEADER_WORDS = ['項次','名稱','品名規格','單位','數量','單價','金額','備註'];
+  var START_ANCHOR_RE = /工程名稱/;
+  var END_ANCHOR_RE = /合\s*計|小\s*計|營業稅|總\s*計|交貨日期|付款辦法|交貨地點|客戶確認|聯絡窗口/;
+  var NOISE_RE = /估\s*價\s*單|ESTIMATION|營業項目|各式中央空調|各式分離式|消防設備系統|各式發電機|台\s*照|工程名稱|地址[:：]|電話[:：]|傳真[:：]|統編|日期[:：]|案號[:：]|以下空白|以下空欄/;
 
-    // 抓出行內所有數字（去逗號）
-    var nums = (raw.match(/[\d,]+(?:\.\d+)?/g) || [])
-      .map(function (s) { return Number(s.replace(/,/g, '')); })
-      .filter(function (n) { return !isNaN(n); });
-    if (nums.length < 2) return;
+  function isPureNumber(s) { return /^[\d,]+(?:\.\d+)?$/.test(s); }
+  function toNumber(s) { return Number(String(s).replace(/,/g, '')); }
+  function isUnitToken(s) { return UNITS.indexOf(s) >= 0; }
 
-    // 找單位
-    var unit = '式';
-    for (var i = 0; i < units.length; i++) {
-      if (raw.indexOf(units[i]) >= 0) { unit = units[i]; break; }
+  function isHeaderWordLine(s) {
+    var rest = s.replace(/\s+/g, '');
+    if (!rest) return false;
+    var changed = true;
+    while (changed && rest) {
+      changed = false;
+      for (var i = 0; i < HEADER_WORDS.length; i++) {
+        if (rest.indexOf(HEADER_WORDS[i]) === 0) { rest = rest.slice(HEADER_WORDS[i].length); changed = true; break; }
+      }
     }
+    return rest === '';
+  }
+  function stripIndexPrefix(s) {
+    return s.replace(/^\s*(?:[0-9０-９]{1,3}|[一二三四五六七八九十百]{1,4})[\.\s、]+/, '').trim();
+  }
+  function isChineseNumeralAmount(s) {
+    return /^[零壹貳參叁肆伍陸柒捌玖拾佰仟萬億元整\s]+$/.test(s) && /[壹貳參叁肆伍陸柒捌玖拾佰仟萬億]/.test(s);
+  }
+  function isNameLike(s) {
+    if (isPureNumber(s)) return false;
+    if (isUnitToken(s)) return false;
+    if (NOISE_RE.test(s)) return false;
+    if (isHeaderWordLine(s)) return false;
+    if (isChineseNumeralAmount(s)) return false;
+    var cjk = (s.match(/[一-鿿]/g) || []).length;
+    var alnum = (s.match(/[A-Za-z0-9]/g) || []).length;
+    return (cjk >= 2) || (cjk >= 1 && alnum >= 1);
+  }
 
-    // 品名 = 行首到第一個數字/單位前的中文與英文
-    var nameMatch = raw.match(/^[^\d]+/);
-    var name = nameMatch ? nameMatch[0].replace(/[\s　]+$/,'').trim() : raw;
-    // 去掉品名尾端可能夾到的單位字
-    units.forEach(function (u) {
-      if (name.slice(-u.length) === u) name = name.slice(0, -u.length).trim();
+  function boundToItemArea(rawLines) {
+    var startIdx = 0;
+    for (var i = 0; i < rawLines.length; i++) { if (START_ANCHOR_RE.test(rawLines[i])) { startIdx = i + 1; } }
+    var endIdx = rawLines.length;
+    for (var j = startIdx; j < rawLines.length; j++) {
+      if (END_ANCHOR_RE.test(rawLines[j])) { endIdx = j; break; }
+    }
+    return rawLines.slice(startIdx, endIdx);
+  }
+
+  function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  // 只在「單位字」前後是空白／字串邊界，或緊接數字時才承認，避免把品名
+  // 內部字元（例如「3.5mm」裡的 m）誤認成單位欄位。
+  var UNIT_BOUNDARY_RE = new RegExp('(^|\\s)(' + UNITS.map(escapeRe).join('|') + ')(?=\\s|[\\d,]|$)');
+
+  function trySingleLinePerRow(boundedLines) {
+    var rows = [];
+    boundedLines.forEach(function (raw) {
+      if (isHeaderWordLine(raw) || NOISE_RE.test(raw)) return;
+      var nums = (raw.match(/[\d,]+(?:\.\d+)?/g) || []).map(toNumber).filter(function (n) { return !isNaN(n); });
+      if (nums.length < 2) return;
+      var um = raw.match(UNIT_BOUNDARY_RE);
+      if (!um) return;
+      var unit = um[2];
+      var name = stripIndexPrefix(raw.slice(0, um.index + um[1].length).trim());
+      if (!name) return;
+      if (name.replace(/[一二三四五六七八九十百0-9０-９\.\s、]/g, '').length < 1) return;
+      var qty, price;
+      if (nums.length >= 3) {
+        var a = nums[nums.length - 3], b = nums[nums.length - 2], c = nums[nums.length - 1];
+        if (Math.abs(a * b - c) <= Math.max(1, c * 0.02)) { qty = a; price = b; }
+        else { qty = 1; price = b; }
+      } else {
+        qty = Math.min(nums[0], nums[1]); price = Math.max(nums[0], nums[1]);
+      }
+      rows.push({ name: name, unit: unit, qty: qty, price: price });
     });
-    if (!name) return;
+    return rows;
+  }
 
-    // 判斷數量/單價/淨額：取最後三個數字嘗試 qty*price≈net
-    var qty = 1, price = 0, net = 0;
-    if (nums.length >= 3) {
-      var a = nums[nums.length - 3], b = nums[nums.length - 2], c = nums[nums.length - 1];
-      if (Math.abs(a * b - c) <= Math.max(1, c * 0.02)) { qty = a; price = b; net = c; }
-      else { qty = 1; price = b; net = c; }
-    } else {
-      // 兩個數字：視為 單價 淨額 或 數量 單價
-      price = nums[0]; net = nums[1];
-      if (Math.abs(price - net) < 0.01) { qty = 1; }
+  var rawLines = String(text || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+  var bounded = boundToItemArea(rawLines);
+
+  // Tier 1：每一行本身就是完整一筆資料
+  var tier1 = trySingleLinePerRow(bounded);
+  var nameCandidateCount = bounded.filter(function (l) {
+    return !isHeaderWordLine(l) && !NOISE_RE.test(l) && isNameLike(l);
+  }).length;
+  if (tier1.length > 0 && tier1.length >= nameCandidateCount) {
+    return tier1.map(function (r) { return { name: r.name, unit: r.unit, qty: r.qty, price: r.price, net: r.qty * r.price }; });
+  }
+
+  // Tier 2/3：品名／單位／數量／單價被拆到不同行
+  var lines = bounded.filter(function (l) { return !isHeaderWordLine(l) && !NOISE_RE.test(l); });
+  var nameIdx = [];
+  lines.forEach(function (l, i) { if (isNameLike(l)) nameIdx.push(i); });
+  if (!nameIdx.length) return [];
+  var N = nameIdx.length;
+  var names = nameIdx.map(function (i) { return stripIndexPrefix(lines[i]); });
+
+  function parseSegTokens(seg) {
+    var nums = [], unit = null;
+    seg.forEach(function (tok) {
+      if (isUnitToken(tok)) { unit = tok; return; }
+      var m = tok.match(/^([一-鿿A-Za-z]{1,3})\s*([\d,]+(?:\.\d+)?)$/);
+      if (m && isUnitToken(m[1])) { unit = m[1]; nums.push(toNumber(m[2])); return; }
+      var m2 = tok.match(/^([\d,]+(?:\.\d+)?)\s*([一-鿿A-Za-z]{1,3})$/);
+      if (m2 && isUnitToken(m2[2])) { unit = m2[2]; nums.push(toNumber(m2[1])); return; }
+      if (isPureNumber(tok)) { nums.push(toNumber(tok)); return; }
+    });
+    return { nums: nums, unit: unit };
+  }
+
+  // 策略 A：同一項目的資料彼此相鄰（該項目名稱前的那一段就是它的數量/單位/單價）
+  function tryRowClustered() {
+    var rows = [];
+    for (var k = 0; k < N; k++) {
+      var segStart = (k === 0) ? 0 : nameIdx[k - 1] + 1;
+      var seg = lines.slice(segStart, nameIdx[k]);
+      var parsed = parseSegTokens(seg);
+      if (parsed.nums.length < 2 || !parsed.unit) return null;
+      var a = parsed.nums[0], b = parsed.nums[1];
+      rows.push({ name: names[k], unit: parsed.unit, qty: Math.min(a, b), price: Math.max(a, b) });
     }
-    out.push({ name: name, unit: unit, qty: qty, price: price, net: net });
-  });
-  return out;
+    return rows;
+  }
+
+  // 策略 B：整欄位資料各自聚成一塊（所有單位一塊、所有單價一塊……），依序對應
+  function tryColumnBlocked() {
+    var nonName = lines.filter(function (l, i) { return nameIdx.indexOf(i) < 0; });
+    var unitTokens = [], numberTokens = [];
+    nonName.forEach(function (tok) {
+      if (isUnitToken(tok)) { unitTokens.push(tok); return; }
+      if (isPureNumber(tok)) { numberTokens.push(toNumber(tok)); return; }
+    });
+    if (unitTokens.length !== N) return null;
+    if (numberTokens.length < 2 * N) return null;
+    var qtys = numberTokens.slice(0, N), prices = numberTokens.slice(N, 2 * N);
+    var rows = [];
+    for (var k = 0; k < N; k++) rows.push({ name: names[k], unit: unitTokens[k], qty: qtys[k], price: prices[k] });
+    return rows;
+  }
+
+  function score(rows) {
+    if (!rows) return -1;
+    var s = 0;
+    rows.forEach(function (r) { if (r.qty > 0 && r.price > 0) s++; if (r.name) s++; });
+    return s;
+  }
+  var a = tryRowClustered(), b = tryColumnBlocked();
+  var chosen = score(a) >= score(b) ? a : b;
+  return (chosen || []).map(function (r) { return { name: r.name, unit: r.unit, qty: r.qty, price: r.price, net: r.qty * r.price }; });
 }
 
 /** 把校對後的項目寫進歷史（常用項目表），供日後查詢/帶入 */
