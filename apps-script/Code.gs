@@ -569,15 +569,55 @@ function extractQuoteRows_(text) {
     return rows;
   }
 
+  // 策略 C：以「單位出現的位置」為錨點分群——每個項目一定恰好有一個單位字，
+  // 即使項次數字跟品名脫節（例如項次單獨一行、品名沒有項次開頭），只要
+  // 單位還在，還是能把同一項目的品名／數量／單價正確歸在一起。也能處理
+  // 「數量與單價在品名之前、單位卻接在品名後面」這種與策略 A 相反的排列。
+  function tryUnitAnchored() {
+    var unitAt = [];
+    lines.forEach(function (l, i) {
+      var um = l.match(UNIT_BOUNDARY_RE);
+      if (um) unitAt.push({ idx: i, unit: um[2], lineBeforeUnit: l.slice(0, um.index + um[1].length).trim() });
+    });
+    if (!unitAt.length) return null;
+    var M = unitAt.length;
+    var rows = [];
+    for (var k = 0; k < M; k++) {
+      var segStart = (k === 0) ? 0 : unitAt[k - 1].idx + 1;
+      var seg = lines.slice(segStart, unitAt[k].idx);
+      // 品名：段落內最後一個「像品名」的候選（離單位最近），可過濾掉
+      // 前一個項目殘留的規格說明行（如「冷房能力：6.3kW」）
+      var nameCandidates = seg.filter(isNameLike);
+      var beforeUnitText = unitAt[k].lineBeforeUnit;
+      // 若單位所在那一行本身還有文字（品名+單位同一行），那段文字才是真正品名
+      var name = beforeUnitText && beforeUnitText.length > 1 ? beforeUnitText
+        : (nameCandidates.length ? nameCandidates[nameCandidates.length - 1] : null);
+      if (!name) return null;
+      name = stripIndexPrefix(name);
+      if (!name) return null;
+      var nums = [];
+      seg.forEach(function (l) {
+        if (nameCandidates.indexOf(l) >= 0) return;
+        if (isPureNumber(l)) nums.push(toNumber(l));
+      });
+      if (nums.length < 2) return null;
+      var a2 = nums[0], b2 = nums[1];
+      rows.push({ name: name, unit: unitAt[k].unit, qty: Math.min(a2, b2), price: Math.max(a2, b2) });
+    }
+    return rows;
+  }
+
   function score(rows) {
     if (!rows) return -1;
     var s = 0;
     rows.forEach(function (r) { if (r.qty > 0 && r.price > 0) s++; if (r.name) s++; });
     return s;
   }
-  var a = tryRowClustered(), b = tryColumnBlocked();
-  var chosen = score(a) >= score(b) ? a : b;
-  return (chosen || []).map(function (r) { return { name: r.name, unit: r.unit, qty: r.qty, price: r.price, net: r.qty * r.price }; });
+  var a = tryRowClustered(), b = tryColumnBlocked(), c = tryUnitAnchored();
+  var best = a, bestScore = score(a);
+  if (score(b) > bestScore) { best = b; bestScore = score(b); }
+  if (score(c) > bestScore) { best = c; bestScore = score(c); }
+  return (best || []).map(function (r) { return { name: r.name, unit: r.unit, qty: r.qty, price: r.price, net: r.qty * r.price }; });
 }
 
 /** 把校對後的項目寫進歷史（常用項目表），供日後查詢/帶入 */
