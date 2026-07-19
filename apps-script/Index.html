@@ -168,6 +168,7 @@
 <script>
 var CUR = null;       // 目前案件明細
 var QUOTES = [];      // 前端報價列暫存
+var LAST_OCR_TEXT = ''; // 最近一次 PDF 讀取的 OCR 原始文字（供回報校準用）
 
 /* ---- 提示 ---- */
 var _toastTimer;
@@ -337,7 +338,9 @@ function uploadPdf(){
   reader.onload=function(){
     var b64=reader.result.split(',')[1];
     google.script.run
-      .withSuccessHandler(function(res){ btn.disabled=false; btn.textContent='讀取 PDF'; renderPdfPreview(res.rows); })
+      .withSuccessHandler(function(res){ btn.disabled=false; btn.textContent='讀取 PDF';
+        LAST_OCR_TEXT=res.text||''; console.log('=== OCR 原始文字（可回報給客服校準用）===\n'+LAST_OCR_TEXT);
+        renderPdfPreview(res.rows); })
       .withFailureHandler(function(e){ btn.disabled=false; btn.textContent='讀取 PDF';
         document.getElementById('pdfPreview').innerHTML='<div class="muted" style="color:#c62828">讀取失敗：'+esc((e&&e.message)||e)+'</div>'; })
       .parseQuotePdf(b64,f.name);
@@ -347,7 +350,11 @@ function uploadPdf(){
 function renderPdfPreview(rows){
   PDFROWS=rows||[];
   if(!PDFROWS.length){
-    document.getElementById('pdfPreview').innerHTML='<div class="muted">沒抓到可辨識的報價列。可能格式較特殊，請手動輸入。</div>';return;
+    document.getElementById('pdfPreview').innerHTML=
+      '<div class="muted">沒抓到可辨識的報價列。可能格式較特殊，請手動輸入。'+
+      '<br>若要回報給客服協助校準，按下面按鈕複製這份 PDF 的辨識原始文字並貼給客服即可（不含金額以外的機敏資料）。'+
+      '<br><button class="ghost small" style="margin-top:6px" onclick="copyOcrText()">複製 OCR 原始文字</button></div>';
+    return;
   }
   var h='<div class="card" style="background:#fffdf5;border:1px solid #e0c97a">'+
     '<h3 style="margin-top:0">讀取結果（請核對後再入庫）</h3>'+
@@ -370,6 +377,26 @@ function renderPdfPreview(rows){
   document.getElementById('pdfPreview').innerHTML=h;
 }
 function pdfUpd(i,k,v){ PDFROWS[i][k]=(k==='name'||k==='unit')?v:Number(v); }
+function copyOcrText(){
+  if(!LAST_OCR_TEXT){ toast('沒有可複製的文字',true); return; }
+  function done(){ toast('已複製，貼給客服即可'); }
+  function showManualBox(){
+    var box=document.getElementById('pdfPreview');
+    box.innerHTML+='<div class="muted" style="margin-top:8px">自動複製失敗，請手動全選下面文字方塊內容複製：</div>'+
+      '<textarea style="width:100%;height:160px;margin-top:4px" readonly onclick="this.select()">'+esc(LAST_OCR_TEXT)+'</textarea>';
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(LAST_OCR_TEXT).then(done).catch(showManualBox);
+    return;
+  }
+  var ta=document.createElement('textarea');
+  ta.value=LAST_OCR_TEXT; ta.style.position='fixed'; ta.style.left='-9999px';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  var ok=false;
+  try{ ok=document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+  if(ok) done(); else showManualBox();
+}
 function pdfRm(i){ PDFROWS.splice(i,1); renderPdfPreview(PDFROWS); }
 function pdfToQuote(){
   var n=0;
